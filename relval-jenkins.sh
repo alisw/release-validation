@@ -79,7 +79,7 @@ set -x
 set +x
 
 # Prepare dataset
-cp release-validation/datasets/${DATASET}.txt files.list
+cp $WORKSPACE/release-validation/datasets/${DATASET}.txt files.list
 
 # Pure (i.e. non-filtered) raws need this parameter
 if ! grep -q filtered files.list; then
