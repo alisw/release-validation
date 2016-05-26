@@ -79,7 +79,12 @@ set -x
 set +x
 
 # Prepare dataset
-cp $WORKSPACE/release-validation/datasets/${DATASET}.txt files.list
+DATASET_FILE="$WORKSPACE/release-validation/datasets/${DATASET}.txt"
+cp "$DATASET_FILE" files.list
+if [[ "$LIMIT_FILES" -gt 0 ]]; then
+  echo "Limiting validation to $LIMIT_FILES file(s)."
+  head -n$LIMIT_FILES "$DATASET_FILE" > files.list
+fi
 
 # Pure (i.e. non-filtered) raws need this parameter
 if ! grep -q filtered files.list; then
@@ -87,12 +92,6 @@ if ! grep -q filtered files.list; then
   cat >> benchmark.config <<EOF
 recoTriggerOptions="?Trigger=kCalibBarrel"
 EOF
-fi
-
-if [[ "$LIMIT_FILES" -gt 0 ]]; then
-  echo "Limiting validation to $LIMIT_FILES file(s)."
-  head -n$LIMIT_FILES files.list > files.list.0
-  mv files.list.0 files.list
 fi
 
 echo "Using dataset $DATASET, list of files follows."
