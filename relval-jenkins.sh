@@ -21,6 +21,7 @@ echo "Release validation name: $RELVAL_NAME"
 
 # Configuration file for the Release Validation.
 cat > benchmark.config <<EOF
+# Note: do not be confused by "2010". It will be substituted with the actual year at runtime.
 defaultOCDB="local:///cvmfs/alice-ocdb.cern.ch/calibration/data/2010/OCDB/"
 batchFlags=""
 reconstructInTemporaryDir=0
