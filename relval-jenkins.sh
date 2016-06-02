@@ -75,16 +75,36 @@ EOF
 
 # Run functions in the Release Validation's environment.
 function relvalenv() {(
-  source utilities.sh
-  source benchmark.config
+  source utilities.sh     &> /dev/null
+  source benchmark.config &> /dev/null
   "$@"
+)}
+
+# Print variable value in the Release Validation's environment.
+function relvalvar() {(
+  source utilities.sh     &> /dev/null
+  source benchmark.config &> /dev/null
+  eval 'echo $'$1
 )}
 
 # Check whether proxy certificate exists and it will still valid be for the next week.
 set -x
   relvalenv true
-  openssl x509 -in "$(relvalenv bash -c 'echo $X509_USER_PROXY')" -noout -checkend $((86400*7))
+  openssl x509 -in "$(relvalvar X509_USER_PROXY)" -noout -checkend $((86400*7))
 set +x
+
+# Check quota on EOS if appropriate.
+EOS_REQ_GB=${REQUIRED_SPACE_GB:=-1}
+if [[ $EOS_REQ_GB -ge 0 && "$(relvalvar baseOutputDirectory)" == */eos/* ]]; then
+  EOS_RE='\([a-z]\+://[^/]\+\)/\(.*$\)'
+  EOS_HOST=$(relvalvar baseOutputDirectory | sed -e 's!'"$EOS_RE"'!\1!')
+  EOS_PATH=$(relvalvar baseOutputDirectory | sed -e 's!'"$EOS_RE"'!\2!')
+  EOS_QUOTA=$(relvalenv eos $EOS_HOST quota $EOS_PATH -m | grep uid=)
+  EOS_FREE_GB=$(eval $EOS_QUOTA; echo $(( ($maxbytes-$usedbytes)/1024/1024/1024 )) )
+  [[ "$EOS_FREE_GB" -ge $EOS_REQ_GB ]] \
+    && { echo "Free space on EOS: $EOS_FREE_GB GB (above $EOS_REQ_GB GB)."; }                  \
+    || { echo "Only $EOS_FREE_GB GB on EOS, but $EOS_REQ_GB GB required. Aborting."; exit 1; }
+fi
 
 # Prepare dataset
 DATASET_FILE="$WORKSPACE/release-validation/datasets/${DATASET}.txt"
@@ -107,13 +127,13 @@ cat files.list
 
 # Allow for monkey-patching the current validation. It takes a tarball from the given URL and
 # unpacks it in the current directory.
-[[ ! -z "$MONKEYPATCH_TARBALL_URL" ]] && (
+if [[ ! -z "$MONKEYPATCH_TARBALL_URL" ]]; then
   echo "Getting and applying monkey-patch tarball from $MONKEYPATCH_TARBALL_URL..."
   relvalenv copyFileFromRemote "$MONKEYPATCH_TARBALL_URL" "$PWD"
   TAR=`basename "$MONKEYPATCH_TARBALL_URL"`
   tar xzvvf "$TAR"
   rm -f "$TAR"
-)
+fi
 
 echo "Starting the Release Validation."
 chmod +x benchmark.sh
