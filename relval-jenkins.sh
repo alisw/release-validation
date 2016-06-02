@@ -3,10 +3,10 @@
 set -o pipefail
 hostname -f
 
-cd /mnt/mesos/sandbox
+set -x
+cd $(mktemp -d /mnt/mesos/sandbox/relval-XXXXX)
 
 # Fetch required scripts from the configurable upstream version of AliPhysics.
-set -x
 for FILE in PWGPP/benchmark/benchmark.sh \
             PWGPP/scripts/utilities.sh \
             PWGPP/scripts/alilog4bash.sh ; do
