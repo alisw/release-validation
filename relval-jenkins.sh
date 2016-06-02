@@ -73,10 +73,17 @@ export X509_USER_PROXY="/secrets/eos-proxy"
 [[ -f "\$X509_USER_PROXY" ]] || exit 41
 EOF
 
+# Run functions in the Release Validation's environment.
+function relvalenv() {(
+  source utilities.sh
+  source benchmark.config
+  "$@"
+)}
+
 # Check whether proxy certificate exists and it will still valid be for the next week.
 set -x
-  ( source benchmark.config )
-  openssl x509 -in "$(source benchmark.config &> /dev/null && echo $X509_USER_PROXY)" -noout -checkend $((86400*7))
+  relvalenv true
+  openssl x509 -in "$(relvalenv bash -c 'echo $X509_USER_PROXY')" -noout -checkend $((86400*7))
 set +x
 
 # Prepare dataset
@@ -102,9 +109,7 @@ cat files.list
 # unpacks it in the current directory.
 [[ ! -z "$MONKEYPATCH_TARBALL_URL" ]] && (
   echo "Getting and applying monkey-patch tarball from $MONKEYPATCH_TARBALL_URL..."
-  source utilities.sh
-  source benchmark.config
-  copyFileFromRemote "$MONKEYPATCH_TARBALL_URL" "$PWD"
+  relvalenv copyFileFromRemote "$MONKEYPATCH_TARBALL_URL" "$PWD"
   TAR=`basename "$MONKEYPATCH_TARBALL_URL"`
   tar xzvvf "$TAR"
   rm -f "$TAR"
