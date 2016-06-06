@@ -139,7 +139,7 @@ echo "Starting the Release Validation."
 chmod +x benchmark.sh
 set +e
 [[ "$DRY_RUN" == true ]] && echo "Dry run: not running the release validation." \
-                         || ./benchmark.sh run "$RELVAL_NAME" files.list benchmark.config
+                         || ./benchmark.sh run "$RELVAL_NAME" files.list benchmark.config $EXTRA_VARIABLES
 RV=$?
 
 echo "Release Validation finished with exitcode $RV."
