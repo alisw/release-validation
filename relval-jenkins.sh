@@ -89,7 +89,7 @@ function relvalvar() {(
 
 # Check whether proxy certificate exists and it will still valid be for the next week.
 set -x
-  relvalenv true
+  ( source benchmark.config )
   openssl x509 -in "$(relvalvar X509_USER_PROXY)" -noout -checkend $((86400*7))
 set +x
 
