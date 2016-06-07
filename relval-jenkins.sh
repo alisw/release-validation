@@ -27,6 +27,7 @@ batchFlags=""
 reconstructInTemporaryDir=0
 recoTriggerOptions="\"\""
 export additionalRecOptions="TPC:useRAWorHLT;"
+export ALIEN_JDL_TARGETSTORAGERESIDUAL=local://./resOCDB
 percentProcessedFilesToContinue=100
 maxSecondsToWait=$(( 3600*24 ))
 nMaxChunks=0
