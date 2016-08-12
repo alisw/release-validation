@@ -8,7 +8,7 @@ cd $(mktemp -d /mnt/mesos/sandbox/relval-XXXXX)
 
 # Fetch required scripts from the configurable upstream version of AliPhysics.
 for FILE in PWGPP/benchmark/benchmark.sh \
-            PWGPP/scripts/utilities.sh \
+            PWGPP/scripts/utilities.sh   \
             PWGPP/scripts/alilog4bash.sh ; do
   curl http://git.cern.ch/pubweb/AliPhysics.git/blob_plain/$RELVAL_ALIPHYSICS_REF:/$FILE -O
 done
@@ -45,7 +45,7 @@ logToFinalDestination=1
 ALIROOT_FORCE_COREDUMP=1
 # Note: -r 3 ==> retry up to 3 times
 makeflowOptions="-T wq -N alirelval_${RELVAL_NAME} -r 3 -C wqcatalog.marathon.mesos:9097"
-baseOutputDirectory="root://eospublic.cern.ch//eos/opstest/pbuncic/output"
+baseOutputDirectory="root://eospublic.cern.ch//eos/experiment/alice/release-validation/output"
 alirootEnv=
 reconstructInTemporaryDir=2
 dontRedirectStdOutToLog=
@@ -91,7 +91,8 @@ function relvalvar() {(
 # Check whether proxy certificate exists and it will still valid be for the next week.
 set -x
   ( source benchmark.config )
-  openssl x509 -in "$(relvalvar X509_USER_PROXY)" -noout -checkend $((86400*7))
+  echo "Checking certificate validity"
+  openssl x509 -in "$(relvalvar X509_USER_PROXY)" -noout -subject -enddate -checkend $((86400*7))
 set +x
 
 # Check quota on EOS if appropriate.
@@ -100,11 +101,16 @@ if [[ $EOS_REQ_GB -ge 0 && "$(relvalvar baseOutputDirectory)" == */eos/* ]]; the
   EOS_RE='\([a-z]\+://[^/]\+\)/\(.*$\)'
   EOS_HOST=$(relvalvar baseOutputDirectory | sed -e 's!'"$EOS_RE"'!\1!')
   EOS_PATH=$(relvalvar baseOutputDirectory | sed -e 's!'"$EOS_RE"'!\2!')
-  EOS_QUOTA=$(relvalenv eos $EOS_HOST quota $EOS_PATH -m | grep uid=)
-  EOS_FREE_GB=$(eval $EOS_QUOTA; echo $(( ($maxbytes-$usedbytes)/1024/1024/1024 )) )
-  [[ "$EOS_FREE_GB" -ge $EOS_REQ_GB ]] \
-    && { echo "Free space on EOS: $EOS_FREE_GB GB (above $EOS_REQ_GB GB)."; }                  \
-    || { echo "Only $EOS_FREE_GB GB on EOS, but $EOS_REQ_GB GB required. Aborting."; exit 1; }
+  EOS_QUOTA_RAW=$(relvalenv eos $EOS_HOST quota $EOS_PATH -m)
+  EOS_QUOTA=$(echo $EOS_QUOTA_RAW | grep uid= || true)
+  [[ -z "$EOS_QUOTA" ]] \
+    && EOS_FREE_GB=infinite \
+    || EOS_FREE_GB=$(eval $EOS_QUOTA; echo $(( ($maxbytes-$usedbytes)/1024/1024/1024 )) )
+    [[ -z "$EOS_QUOTA" || "$EOS_FREE_GB" -ge $EOS_REQ_GB ]] \
+      && echo "Free space on EOS: $EOS_FREE_GB GB (above $EOS_REQ_GB GB)." \
+      || { echo "Only $EOS_FREE_GB GB on EOS, but $EOS_REQ_GB GB required. Aborting."; exit 1; }
+  else
+    echo ""
 fi
 
 # Prepare dataset

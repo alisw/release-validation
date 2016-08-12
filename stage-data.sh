@@ -11,7 +11,7 @@ TMPDATA=/tmp/relval_stage_$(echo $RAWPATH | sha1sum | cut -d' ' -f1)
 RAWPATH=/$(echo $RAWPATH | sed -e 's!/+!/!g; s!/$!!; s!^/!!')
 ALIEN_PREFIX=alien://$RAWPATH
 [[ $RAWPATH =~ /([0-9]{4}/LHC[0-9]+[a-z]+/[0-9]{9})/ ]] || { echo "Invalid source path."; exit 1; }
-EOS_PREFIX=root://eospublic.cern.ch//eos/opstest/pbuncic/reference/${BASH_REMATCH[1]}
+EOS_PREFIX=root://eospublic.cern.ch//eos/experiment/alice/release-validation/reference/${BASH_REMATCH[1]}
 BUF=/tmp/raw_temp_$$.root
 
 function try_again() {
