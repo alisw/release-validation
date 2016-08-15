@@ -147,13 +147,34 @@ if [[ ! -z "$MONKEYPATCH_TARBALL_URL" ]]; then
   rm -f "$TAR"
 fi
 
-echo "Starting the Release Validation."
 chmod +x benchmark.sh
-set +e
 [[ "$DRY_RUN" == true ]] && { echo "Dry run: not running the release validation.";
                               DRY_RUN_PREFIX="echo Would have run: "; }
-$DRY_RUN_PREFIX ./benchmark.sh run "$RELVAL_NAME" files.list benchmark.config $EXTRA_VARIABLES
-RV=$?
+
+if [[ $SUMMARIZE_ONLY == true ]]; then
+  echo "Starting the Release Validation summary only."
+  OUTPUT=$(relvalvar baseOutputDirectory)/$RELVAL_NAME
+  set +e
+    relvalenv xCopy -f -d $PWD $OUTPUT/benchmark.makeflow $OUTPUT/benchmark.config
+  set -e
+  [[ -e benchmark.makeflow ]]
+  REQUIRED=$(grep ^summary.log: benchmark.makeflow | cut -d: -f2)
+  REQUIRED=$(for FILE in $REQUIRED; do [[ $FILE == *.done ]] && echo $OUTPUT/$FILE || true; done)
+  set +e
+    relvalenv xCopy -f -d $PWD $REQUIRED
+  set -e
+  for FILE in $REQUIRED; do
+    [[ -e $(basename $FILE) ]] || { echo "Some files were not copied."; exit 1; }
+  done
+  CMD=$(grep -A1 ^summary.log: benchmark.makeflow | tail -n1 | xargs echo)
+  $DRY_RUN_PREFIX $CMD simplifiedSummary=1
+  RV=$?
+else
+  echo "Starting the Release Validation."
+  set +e
+  $DRY_RUN_PREFIX ./benchmark.sh run "$RELVAL_NAME" files.list benchmark.config $EXTRA_VARIABLES
+  RV=$?
+fi
 
 echo "Release Validation finished with exitcode $RV."
 echo "Current directory (contents follow): $PWD"
