@@ -1,5 +1,10 @@
 #!/bin/bash -e
 
+for V in LANG LANGUAGE LC_ALL LC_COLLATE LC_CTYPE LC_MESSAGES LC_MONETARY \
+         LC_NUMERIC LC_TIME LC_ALL; do
+  export $V=C
+done
+
 set -o pipefail
 hostname -f
 
