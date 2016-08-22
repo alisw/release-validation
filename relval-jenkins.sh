@@ -24,6 +24,8 @@ RELVAL_SHORT_NAME=AliPhysics-${ALIPHYSICS_VERSION}
 RELVAL_NAME=${RELVAL_SHORT_NAME}-${RELVAL_TIMESTAMP}
 echo "Release validation name: $RELVAL_NAME"
 
+OUTPUT_URL="https://ali-ci.cern.ch/release-validation/$RELVAL_NAME"
+
 # Configuration file for the Release Validation.
 cat > benchmark.config <<EOF
 # Note: do not be confused by "2010". It will be substituted with the actual year at runtime.
@@ -93,6 +95,17 @@ function relvalvar() {(
   eval 'echo $'$1
 )}
 
+# Post a comment to a given ALICE JIRA ticket. Errors are non-fatal.
+function jira() {
+  [[ -z $JIRA_ISSUE ]] && return 0 || true
+  curl -k -D- -X POST                                                      \
+       -u $JIRA_USER:$JIRA_PASS                                            \
+       --data '{ "body": "'"$*"'" }'                                       \
+       -H "Content-Type: application/json"                                 \
+       https://alice.its.cern.ch/jira/rest/api/2/issue/$JIRA_ISSUE/comment \
+       || true
+}
+
 # Check whether proxy certificate exists and it will still valid be for the next week.
 set -x
   ( source benchmark.config )
@@ -147,6 +160,10 @@ if [[ ! -z "$MONKEYPATCH_TARBALL_URL" ]]; then
   rm -f "$TAR"
 fi
 
+jira "Release validation for *AliPhysics $ALIPHYSICS_VERSION* started.\n" \
+     " * [Jenkins log|$BUILD_URL/console]\n"                              \
+     " * [Validation output|$OUTPUT_URL] (it might be still empty)\n"     \
+
 chmod +x benchmark.sh
 [[ "$DRY_RUN" == true ]] && { echo "Dry run: not running the release validation.";
                               DRY_RUN_PREFIX="echo Would have run: "; }
@@ -161,12 +178,13 @@ if [[ $SUMMARIZE_ONLY == true ]]; then
   REQUIRED=$(grep ^summary.log: benchmark.makeflow | cut -d: -f2)
   REQUIRED=$(for FILE in $REQUIRED; do [[ $FILE == *.done ]] && echo $OUTPUT/$FILE || true; done)
   set +e
-    relvalenv xCopy -f -d $PWD $REQUIRED
+    $DRY_RUN_PREFIX relvalenv xCopy -f -d $PWD $REQUIRED
   set -e
   for FILE in $REQUIRED; do
-    [[ -e $(basename $FILE) ]] || { echo "Some files were not copied."; exit 1; }
+    [[ $DRY_RUN == true || -e $(basename $FILE) ]] || { echo "Some files were not copied."; exit 1; }
   done
   CMD=$(grep -A1 ^summary.log: benchmark.makeflow | tail -n1 | xargs echo)
+  set +e
   $DRY_RUN_PREFIX $CMD simplifiedSummary=1
   RV=$?
 else
@@ -175,6 +193,15 @@ else
   $DRY_RUN_PREFIX ./benchmark.sh run "$RELVAL_NAME" files.list benchmark.config $EXTRA_VARIABLES
   RV=$?
 fi
+
+[[ $RV == 0 ]] && JIRASTATUS="*{color:green}success{color}*" \
+               || JIRASTATUS="*{color:red}errors{color}*"
+
+jira "Release validation for *AliPhysics $ALIPHYSICS_VERSION* finished with $JIRASTATUS.\n"         \
+     " * [Jenkins log|$BUILD_URL/console]\n"                                                        \
+     " * [Validation output|$OUTPUT_URL]\n"                                                         \
+     " * [Validation summary|$OUTPUT_URL/summary.log]\n"                                            \
+     " * QA plots for [CPass1|$OUTPUT_URL/QAplots_CPass1] and [PPass|$OUTPUT_URL/QAplots_CPass2]\n"
 
 echo "Release Validation finished with exitcode $RV."
 echo "Current directory (contents follow): $PWD"
