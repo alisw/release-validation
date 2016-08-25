@@ -197,11 +197,38 @@ fi
 [[ $RV == 0 ]] && JIRASTATUS="*{color:green}success{color}*" \
                || JIRASTATUS="*{color:red}errors{color}*"
 
+# List of detector responsibles to tag
+DETECTORS=(
+  "ACORDE:mrodrigu"
+  "AD:mbroz"
+  "EMCAL:gconesab"
+  "FMD:cholm"
+  "HMPID:gvolpe"
+  "ITS:masera"
+  "MUON:ihrivnac"
+  "PHOS:kharlov"
+  "TOF:decaro"
+  "TPC:kschweda mivanov"
+  "TRD:tdietel"
+  "T0:alla"
+  "V0:cvetan"
+  "ZDC:coppedis"
+  "Reconstruction:shahoian"
+  "Calibration:zampolli"
+)
+
+TAGFMT='[~%s]'
+[[ $DRY_RUN == true ]] && TAGFMT='{{~%s}}'
 jira "Release validation for *AliPhysics $ALIPHYSICS_VERSION* finished with $JIRASTATUS.\n"         \
      " * [Jenkins log|$BUILD_URL/console]\n"                                                        \
      " * [Validation output|$OUTPUT_URL]\n"                                                         \
      " * [Validation summary|$OUTPUT_URL/summary.log]\n"                                            \
-     " * QA plots for [CPass1|$OUTPUT_URL/QAplots_CPass1] and [PPass|$OUTPUT_URL/QAplots_CPass2]\n"
+     " * QA plots for [CPass1|$OUTPUT_URL/QAplots_CPass1] and [PPass|$OUTPUT_URL/QAplots_CPass2]\n" \
+     "\n"                                                                                           \
+     "Mentioning detector and component responsibles for sign-off:\n"                               \
+     "$(for D in "${DETECTORS[@]}"; do
+          printf " * ${D%%:*}:"; for R in ${D#*:}; do printf " $TAGFMT" "$R"; done; echo -n "\n"
+        done)"
 
 echo "Release Validation finished with exitcode $RV."
 echo "Current directory (contents follow): $PWD"
