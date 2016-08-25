@@ -206,6 +206,7 @@ DETECTORS=(
   "HMPID:gvolpe"
   "ITS:masera"
   "MUON:ihrivnac"
+  "PMD:bnandi"
   "PHOS:kharlov"
   "TOF:decaro"
   "TPC:kschweda mivanov"
