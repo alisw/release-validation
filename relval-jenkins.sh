@@ -203,6 +203,7 @@ DETECTORS=(
   "AD:mbroz"
   "EMCAL:gconesab"
   "FMD:cholm"
+  "HLT:mkrzewic"
   "HMPID:gvolpe"
   "ITS:masera"
   "MUON:ihrivnac"
