@@ -211,7 +211,7 @@ DETECTORS=(
   "PMD:bnandi"
   "PHOS:kharlov"
   "TOF:decaro"
-  "TPC:kschweda mivanov"
+  "TPC:kschweda mivanov wiechula"
   "TRD:tdietel"
   "T0:alla"
   "V0:cvetan"
@@ -225,7 +225,7 @@ TAGFMT='[~%s]'
 jira "Release validation for *AliPhysics $ALIPHYSICS_VERSION* finished with $JIRASTATUS.\n"         \
      " * [Jenkins log|$BUILD_URL/console]\n"                                                        \
      " * [Validation output|$OUTPUT_URL]\n"                                                         \
-     " * [Validation summary|$OUTPUT_URL/summary.log]\n"                                            \
+     " * Validation summary: [HTML|$OUTPUT_URL/summary.html], [text|$OUTPUT_URL/summary.log]\n"     \
      " * QA plots for [CPass1|$OUTPUT_URL/QAplots_CPass1] and [PPass|$OUTPUT_URL/QAplots_CPass2]\n" \
      "\n"                                                                                           \
      "Mentioning detector and component responsibles for sign-off:\n"                               \
