@@ -15,7 +15,7 @@ cd $(mktemp -d /mnt/mesos/sandbox/relval-XXXXX)
 for FILE in PWGPP/benchmark/benchmark.sh \
             PWGPP/scripts/utilities.sh   \
             PWGPP/scripts/alilog4bash.sh ; do
-  curl http://git.cern.ch/pubweb/AliPhysics.git/blob_plain/$RELVAL_ALIPHYSICS_REF:/$FILE -O
+  curl https://raw.githubusercontent.com/alisw/AliPhysics/$RELVAL_ALIPHYSICS_REF/$FILE -O
 done
 set +x
 
