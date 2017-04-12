@@ -210,7 +210,7 @@ DETECTORS=(
   "MUON:laphecet"
   "PMD:bnandi"
   "PHOS:kharlov"
-  "TOF:decaro"
+  "TOF:fnoferin"
   "TPC:kschweda mivanov wiechula"
   "TRD:tdietel"
   "T0:alla"
