@@ -186,6 +186,7 @@ node("$RUN_ARCH-relval") {
         RELVAL_BRANCH="${RELVAL##*:}"
         RELVAL_REPO="${RELVAL%:*}"
         [[ $RELVAL_BRANCH == $RELVAL ]] && RELVAL_BRANCH= || true
+        rm -rf release-validation/
         git clone "https://github.com/$RELVAL_REPO" ${RELVAL_BRANCH:+-b "$RELVAL_BRANCH"} release-validation/
 
         echo "We will be using AliPhysics $ALIPHYSICS_VERSION with the following environment"
