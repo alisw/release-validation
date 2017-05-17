@@ -96,14 +96,39 @@ function relvalvar() {(
 )}
 
 # Post a comment to a given ALICE JIRA ticket. Errors are non-fatal.
-function jira() {
+function jira_comment() {
   [[ -z $JIRA_ISSUE ]] && return 0 || true
   curl -k -D- -X POST                                                      \
+       --connect-timeout 5                                                 \
+       --max-time 10                                                       \
+       --retry 5                                                           \
+       --retry-delay 0                                                     \
+       --retry-max-time 40                                                 \
        -u $JIRA_USER:$JIRA_PASS                                            \
        --data '{ "body": "'"$*"'" }'                                       \
        -H "Content-Type: application/json"                                 \
        https://alice.its.cern.ch/jira/rest/api/2/issue/$JIRA_ISSUE/comment \
        || true
+}
+
+function jira_watchers() {
+  [[ -z $JIRA_ISSUE ]] && return 0 || true
+  while [[ $# -gt 0 ]]; do
+    # JIRA is stupid. We have to make an API call for each watcher.
+    curl -k -D- -X POST                                                       \
+         --connect-timeout 5                                                  \
+         --max-time 10                                                        \
+         --retry 5                                                            \
+         --retry-delay 0                                                      \
+         --retry-max-time 40                                                  \
+         -u $JIRA_USER:$JIRA_PASS                                             \
+         --data '"'$1'"'                                                      \
+         -H "Content-Type: application/json"                                  \
+         https://alice.its.cern.ch/jira/rest/api/2/issue/$JIRA_ISSUE/watchers \
+         || true
+    shift
+  done
+  return 0
 }
 
 # Check whether proxy certificate exists and it will still valid be for the next week.
@@ -160,9 +185,35 @@ if [[ ! -z "$MONKEYPATCH_TARBALL_URL" ]]; then
   rm -f "$TAR"
 fi
 
-jira "Release validation for *AliPhysics $ALIPHYSICS_VERSION* started.\n" \
-     " * [Jenkins log|$BUILD_URL/console]\n"                              \
-     " * [Validation output|$OUTPUT_URL] (it might be still empty)\n"     \
+# List of components/detectors contact persons
+DETECTORS=(
+  "ACORDE:mrodrigu"
+  "AD:mbroz"
+  "EMCAL:gconesab"
+  "FMD:cholm"
+  "HLT:mkrzewic"
+  "HMPID:gvolpe"
+  "ITS:masera"
+  "MUON:laphecet"
+  "PMD:bnandi"
+  "PHOS:kharlov"
+  "TOF:fnoferin"
+  "TPC:kschweda mivanov wiechula"
+  "TRD:tdietel"
+  "T0:alla"
+  "V0:cvetan"
+  "ZDC:coppedis"
+  "Reconstruction:shahoian"
+  "Calibration:zampolli"
+  "DevOps:hristov dberzano eulisse"
+)
+
+JIRA_WATCHERS=($(for D in "${DETECTORS[@]}"; do echo ${D##*:}; done | xargs -n1 echo | sort -u))
+jira_watchers "${JIRA_WATCHERS[@]}"
+
+jira_comment "Release validation for *AliPhysics $ALIPHYSICS_VERSION* started.\n" \
+             " * [Jenkins log|$BUILD_URL/console]\n"                              \
+             " * [Validation output|$OUTPUT_URL] (it might be still empty)\n"     \
 
 chmod +x benchmark.sh
 [[ "$DRY_RUN" == true ]] && { echo "Dry run: not running the release validation.";
@@ -198,40 +249,19 @@ fi
 [[ $RV == 0 ]] && JIRASTATUS="*{color:green}success{color}*" \
                || JIRASTATUS="*{color:red}errors{color}*"
 
-# List of detector responsibles to tag
-DETECTORS=(
-  "ACORDE:mrodrigu"
-  "AD:mbroz"
-  "EMCAL:gconesab"
-  "FMD:cholm"
-  "HLT:mkrzewic"
-  "HMPID:gvolpe"
-  "ITS:masera"
-  "MUON:laphecet"
-  "PMD:bnandi"
-  "PHOS:kharlov"
-  "TOF:fnoferin"
-  "TPC:kschweda mivanov wiechula"
-  "TRD:tdietel"
-  "T0:alla"
-  "V0:cvetan"
-  "ZDC:coppedis"
-  "Reconstruction:shahoian"
-  "Calibration:zampolli"
-)
-
 TAGFMT='[~%s]'
 [[ $DRY_RUN == true ]] && TAGFMT='{{~%s}}'
-jira "Release validation for *AliPhysics $ALIPHYSICS_VERSION* finished with $JIRASTATUS.\n"         \
-     " * [Jenkins log|$BUILD_URL/console]\n"                                                        \
-     " * [Validation output|$OUTPUT_URL]\n"                                                         \
-     " * Validation summary: [HTML|$OUTPUT_URL/summary.html], [text|$OUTPUT_URL/summary.log]\n"     \
-     " * QA plots for [CPass1|$OUTPUT_URL/QAplots_CPass1] and [PPass|$OUTPUT_URL/QAplots_CPass2]\n" \
-     "\n"                                                                                           \
-     "Mentioning detector and component responsibles for sign-off:\n"                               \
-     "$(for D in "${DETECTORS[@]}"; do
-          printf " * ${D%%:*}:"; for R in ${D#*:}; do printf " $TAGFMT" "$R"; done; echo -n "\n"
-        done)"
+jira_comment                                                                                     \
+  "Release validation for *AliPhysics $ALIPHYSICS_VERSION* finished with $JIRASTATUS.\n"         \
+  " * [Jenkins log|$BUILD_URL/console]\n"                                                        \
+  " * [Validation output|$OUTPUT_URL]\n"                                                         \
+  " * Validation summary: [HTML|$OUTPUT_URL/summary.html], [text|$OUTPUT_URL/summary.log]\n"     \
+  " * QA plots for [CPass1|$OUTPUT_URL/QAplots_CPass1] and [PPass|$OUTPUT_URL/QAplots_CPass2]\n" \
+  "\n"                                                                                           \
+  "Mentioning contact persons for detectors and components:\n"                                   \
+  "$(for D in "${DETECTORS[@]}"; do
+       printf " * ${D%%:*}:"; for R in ${D#*:}; do printf " $TAGFMT" "$R"; done; echo -n "\n"
+     done)"
 
 echo "Release Validation finished with exitcode $RV."
 echo "Current directory (contents follow): $PWD"
