@@ -154,6 +154,17 @@ node("$RUN_ARCH-relval") {
     '''
   }
 
+  stage "Checking framework"
+  sh '''
+    set -e
+    set -o pipefail
+    curl -X DELETE -H "Content-type: application/json" "http://leader.mesos:8080/v2/apps/wqmesos/tasks?scale=true"
+    curl -X DELETE -H "Content-type: application/json" "http://leader.mesos:8080/v2/apps/wqcatalog/tasks?scale=true"
+    curl -X PUT -H "Content-type: application/json" --data '{ "instances": 1 }' "http://leader.mesos:8080/v2/apps/wqcatalog?force=true"
+    sleep 90
+    curl -X PUT -H "Content-type: application/json" --data '{ "instances": 1 }' "http://leader.mesos:8080/v2/apps/wqmesos?force=true"
+  '''
+
   stage "Validating"
   withEnv(["RELVAL_ALIPHYSICS_REF=$RELVAL_ALIPHYSICS_REF",
            "LIMIT_FILES=$LIMIT_FILES",
