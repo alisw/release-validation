@@ -11,11 +11,21 @@ hostname -f
 set -x
 cd $(mktemp -d /mnt/mesos/sandbox/relval-XXXXX)
 
-# Fetch required scripts from the configurable upstream version of AliPhysics.
-for FILE in PWGPP/benchmark/benchmark.sh \
-            PWGPP/scripts/utilities.sh   \
-            PWGPP/scripts/alilog4bash.sh ; do
-  curl https://raw.githubusercontent.com/alisw/AliPhysics/$RELVAL_ALIPHYSICS_REF/$FILE -O
+# Fetch required scripts from the configurable upstream version of AliPhysics
+# or AliRoot. If RELVAL_*_REF are not set, defaults to HEAD (whatever the
+# default branch is): this is GitHub's behaviour. Note that some files have
+# multiple possible sources for compatibility.
+for FILE in "AliPhysics/$RELVAL_ALIPHYSICS_REF/PWGPP/benchmark/benchmark.sh"                                                            \
+            "AliRoot/$RELVAL_ALIROOT_REF/STEER/Utilities/utilities.sh|AliPhysics/$RELVAL_ALIPHYSICS_REF/PWGPP/scripts/utilities.sh"     \
+            "AliRoot/$RELVAL_ALIROOT_REF/STEER/Utilities/alilog4bash.sh|AliPhysics/$RELVAL_ALIPHYSICS_REF/PWGPP/scripts/alilog4bash.sh" ; do
+  while [[ $FILE ]]; do
+    F=${FILE%%|*}
+    FILE=${FILE#*|}
+    [[ $FILE != $F ]] || FILE=
+    curl -sf https://raw.githubusercontent.com/alisw/$F -O && break || continue
+  done
+  [[ -f $(basename $F) ]] || { echo "Cannot retrieve $(basename $F), aborting"; exit 1; }
+  echo "Downloaded $F"
 done
 set +x
 
