@@ -1,5 +1,5 @@
 *.pyc
-/work
-/alien_jdl2makeflow.egg-info
+/example/work
+/*egg-info
 /dist
 /build

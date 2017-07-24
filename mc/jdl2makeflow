@@ -64,7 +64,7 @@ for INP in "${INPUT_LIST[@]}"; do
 done
 {% if source_env -%}
 # Set custom environment (work around bad user concurrency by locking)
-LOCKDIR=${TMPDIR:=/tmp}/makeflow_env_lock
+LOCKDIR=/tmp/makeflow_env_lock
 MAXWAIT=1000
 sleep 0.1 &> /dev/null || MAXWAIT=100
 for ((I=0; I<$MAXWAIT; I++)); do
@@ -88,7 +88,7 @@ echo "Output will be in $ALIEN_JDL_OUTPUTDIR"
 
 # Execute command and ignore errors
 {% if dry_run -%}
-echo "Doing nothing: dry run" > stdout.log
+echo "Doing nothing: dry run" >> stdout.log
 {% else -%}
 ARGS=$(printf -- "{{args}}" "$JOBID")
 PROG="{{executable}}"
@@ -96,7 +96,7 @@ type "$PROG" &> /dev/null || PROG="{{executable|basename()}}"
 type "$PROG" &> /dev/null || PROG="$ALIDPG_ROOT/bin/{{executable|basename()}}"
 type "$PROG" &> /dev/null || PROG="./{{executable|basename()}}"
 MAINERR=0
-{ env; echo + $PROG $* $ARGS; } > stdout.log
+{ env; echo + $PROG $* $ARGS; } >> stdout.log
 $PROG "$@" $ARGS  > >(tee -a stdout.log) \\
                  2> >(tee -a stderr.log) || MAINERR=$?
 {% endif -%}
@@ -215,7 +215,9 @@ def get_preprocessed_jdl(jdl_fn, override={}, append={}, delete=[]):
   return jdl
 
 # First tier of jobs
+all_inputs = {}
 jdl = get_preprocessed_jdl(args.jdl)
+all_inputs["Jobs"] = jdl["InputFile"]
 
 # Second tier of jobs: Space Point Calibration
 jdl_spc = {}
@@ -231,6 +233,7 @@ if "SpacePointCalibration" in jdl.get("NextStages", []):
               delete={ "NextStages", "JobRange" })
   xml_spc = get_alien_xml(os.path.join(jdl["OutputDir"], "FilterEvents_Trees.root"),
                           jdl["JobRange"][0], jdl["JobRange"][1])
+  all_inputs["SpacePointCalibration"] = jdl_spc["InputFile"]
 
 # Second tier of jobs: FinalQA
 jdl_fqa = {}
@@ -245,6 +248,7 @@ if "FinalQA" in jdl.get("NextStages", []):
               delete={ "NextStages", "JobRange" })
   xml_fqa = get_alien_xml(os.path.join(jdl["OutputDir"], "QA_archive.zip"),
                           jdl["JobRange"][0], jdl["JobRange"][1])
+  all_inputs["FinalQA"] = jdl_fqa["InputFile"]
   jdl_qap = get_preprocessed_jdl(args.jdl,
               override={ "Output": [ "qa_plots/*", "std*" ],
                          "OutputDir": os.path.join(os.path.dirname(jdl["OutputDir"]), "QAplots"),
@@ -252,6 +256,7 @@ if "FinalQA" in jdl.get("NextStages", []):
                          "SplitArguments": os.path.join(os.path.dirname(jdl["OutputDir"]), "QA_merge_archive.zip") },
               append={ "InputFile": [ "qa_plots.sh" ] },
               delete={ "NextStages", "JobRange" })
+  all_inputs["QAPlots"] = jdl_qap["InputFile"]
 
 if args.parse_jdl:
   print("# First tier of jobs")
@@ -322,7 +327,7 @@ if jdl_fqa:
   gen_runjob(os.path.join(args.work_dir, "runqaplots.sh"), jdl_qap, args.dry_run)
 
 # Copy input files in the work directory
-for f in jdl["InputFile"] + jdl_spc.get("InputFile", []) + jdl_fqa.get("InputFile", []) + jdl_qap.get("InputFile", []):
+for f in [ i for k in all_inputs for i in all_inputs[k] ]:
   dest = os.path.join(args.work_dir, f)
   if os.path.isfile(dest): continue
   try:
@@ -342,26 +347,26 @@ gen_runjob(os.path.join(args.work_dir, "runjob.sh"), jdl, args.dry_run)
 makeflow = j2env.from_string("""# Automatically generated
 
 {% for jobindex in range(joba,jobb) -%}
-job{{ "%04d"|format(jobindex) }}.done: runjob.sh {{input_list|join(" ")}}
+job{{ "%04d"|format(jobindex) }}.done: runjob.sh {{input_list["Jobs"]|join(" ")}}
 	./runjob.sh {{jobindex}} job{{"%04d"|format(jobindex)}}.done
-
 {% endfor -%}
+
 {% if "SpacePointCalibration" in next_stages -%}
-spc.done: runspc.sh {{input_list|join(" ")}}{% for jobindex in range(joba,jobb) %} job{{"%04d"|format(jobindex)}}.done{% endfor %}
+spc.done: runspc.sh {{input_list["SpacePointCalibration"]|join(" ")}}{% for jobindex in range(joba,jobb) %} job{{"%04d"|format(jobindex)}}.done{% endfor %}
 	./runspc.sh 0 spc.done
 {% endif -%}
-{% if "FinalQA" in next_stages -%}
-finalqa.done: runfinalqa.sh {{input_list|join(" ")}}{% for jobindex in range(joba,jobb) %} job{{"%04d"|format(jobindex)}}.done{% endfor %}
-	./runfinalqa.sh 0 finalqa.done
 
-qaplots.done: runqaplots.sh finalqa.done {{input_list|join(" ")}}
+{% if "FinalQA" in next_stages -%}
+finalqa.done: runfinalqa.sh {{input_list["FinalQA"]|join(" ")}}{% for jobindex in range(joba,jobb) %} job{{"%04d"|format(jobindex)}}.done{% endfor %}
+	./runfinalqa.sh 0 finalqa.done
+qaplots.done: runqaplots.sh finalqa.done {{input_list["QAPlots"]|join(" ")}}
 	./runqaplots.sh 0 qaplots.done
 {% endif %}
 """)
 makeflow_fn = os.path.join(args.work_dir, "Makeflow")
 with open(makeflow_fn, "w") as mf:
   mf.write(makeflow.render(pars        = jdl["SplitArguments"],
-                           input_list  = jdl["InputFile"],
+                           input_list  = all_inputs,
                            joba        = jdl["JobRange"][0],
                            jobb        = jdl["JobRange"][1]+1,
                            next_stages = jdl.get("NextStages", [])))
