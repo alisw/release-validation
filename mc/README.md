@@ -146,6 +146,11 @@ ignored by AliEn.
   This variable allows you to run those stages without supplying their
   respective JDLs (parameters will be deduced from the current one and modified
   accordingly).
+* `QADetectorInclude`: string with a list of space-separated detector names to
+  be included when generating the QA plots. Leave empty for including all
+  detectors. In order to expose it to the job you must add it to `JDLVariables`.
+* `QADetectorExclude`: exclude detectors from QA plots. Same format as
+  `QADetectorInclude`. Has to be added to `JDLVariables` too.
 
 
 Overriding JDL variables
