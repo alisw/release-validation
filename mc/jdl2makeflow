@@ -44,7 +44,7 @@ def preprocess_var(s):
   return re.sub("#alien_counter_([^#]+)#", "%\\1", s)
 
 def gen_runjob(output_file, jdl, dry_run):
-  runjob = j2env.from_string("""#!/bin/bash -ex
+  runjob = j2env.from_string("""#!/bin/bash -e
 type zip unzip zipinfo
 JOBHASH=$(echo "$*" | sha1sum | awk '{print $1}')
 JOBID=$1
@@ -63,8 +63,16 @@ for INP in "${INPUT_LIST[@]}"; do
   cp -v ../"$INP" .
 done
 {% if source_env -%}
-# Set custom environment
+# Set custom environment (work around bad user concurrency by locking)
+LOCKDIR=${TMPDIR:=/tmp}/makeflow_env_lock
+MAXWAIT=1000
+sleep 0.1 &> /dev/null || MAXWAIT=100
+for ((I=0; I<$MAXWAIT; I++)); do
+  mkdir $LOCKDIR &> /dev/null && break || true
+  sleep 0.1 || sleep 1
+done
 source "{{source_env}}"
+rmdir $LOCKDIR
 {% else -%}
 eval $(/cvmfs/alice.cern.ch/bin/alienv printenv {{packages|join(",")}})
 {% endif -%}
@@ -273,7 +281,8 @@ Output files (archives with content listed):
 
 Environment variables available to the jobs:
 %(env)s
-""" % { "packages" : " * "+"\n * ".join(jdl["Packages"]),
+""" % { "packages" : " * "+"\n * ".join(jdl["Packages"]) if not "SourceEnvScript" in jdl else \
+                     " * Custom environment sourced from " + jdl["SourceEnvScript"],
         "numjobs"  : jdl["JobRange"][1]-jdl["JobRange"][0]+1,
         "joba"     : jdl["JobRange"][0],
         "jobb"     : jdl["JobRange"][1],
