@@ -7,13 +7,15 @@ DET_INCL=$ALIEN_JDL_QADETECTORINCLUDE
 DET_EXCL=$ALIEN_JDL_QADETECTOREXCLUDE
 
 while [[ $# -gt 0 ]]; do
-  if [[ "$1" == *.zip ]]; then
-    root -l -b <<EOF
-TFile::Cp("$1", "$(basename "$1")");
+  F="$PWD/$(basename "$1")"
+  root -l -b <<EOF || true
+TFile::Cp("$1", "$F");
 EOF
-    FILES=($(unzip -Z -1 $(basename "$1")|xargs -i echo "$PWD/$(basename "$1")#{}"))
+  [[ -f $F ]] || { shift; continue; }
+  if [[ "$1" == *.zip ]]; then
+    FILES=($(unzip -Z -1 "$F"|xargs -i echo "$F#{}"))
   else
-    FILES=$1
+    FILES="$F"
   fi
   for F in ${FILES[@]}; do
     case "$F" in

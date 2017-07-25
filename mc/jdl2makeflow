@@ -203,10 +203,31 @@ def get_preprocessed_jdl(jdl_fn, override={}, append={}, delete=[]):
     environment[v] = preprocess_var(jdl.get(v, ""))  # exported as-is
   jdl["Environment"] = environment
 
+  # Output requested not in zip files
+  if jdl.get("DontArchive", None) == "1":
+    jdl["DontArchive"] = True
+    new_output = []
+    for o in jdl["Output"]:
+      if ":" in o:
+        new_output += o.split(":", 1)[1].split(",")
+      else:
+        new_output.append(o)
+    jdl["Output"] = new_output
+  else:
+    jdl["DontArchive"] = False
+
+  # Save everything but no input files
+  if jdl.get("SaveAll", None) == "1":
+    jdl["SaveAll"] = True
+    jdl["Output"] = [ "!(%s)" % "|".join(jdl["InputFile"]) ]
+  else:
+    jdl["SaveAll"] = False
+
   # Remove unneeded variables (cleanup)
   all_vars = jdl.keys()
   whitelist = [ "SplitArguments", "Executable", "Packages", "JobRange", "JobRange", "Output",
-                "InputFile", "Environment", "NextStages", "OutputDir", "SourceEnvScript" ] + \
+                "InputFile", "Environment", "NextStages", "OutputDir", "SourceEnvScript",
+                "SaveAll", "DontArchive" ] + \
               override.keys() + append.keys()
   for k in all_vars:
     if k in delete or k not in whitelist:
@@ -238,22 +259,33 @@ if "SpacePointCalibration" in jdl.get("NextStages", []):
 # Second tier of jobs: FinalQA
 jdl_fqa = {}
 if "FinalQA" in jdl.get("NextStages", []):
+  inputfile_fqa = "finalqa.txt" if jdl["DontArchive"] or jdl["SaveAll"] else "finalqa.xml"
   jdl_fqa = get_preprocessed_jdl(args.jdl,
               override={ "Output": [ "QA_merge_log_archive.zip:std*,fileinfo*.log@disk=1",
                                      "QA_merge_archive.zip:*QAresults*.root,EventStat_temp*.root,trending*.root,event_stat*.root,*.stat*@disk=3" ],
                          "OutputDir": os.path.join(os.path.dirname(jdl["OutputDir"])),
                          "Executable": "train_merge.sh",
-                         "SplitArguments": "finalqa.xml 5" },  # 5 is the stage number
-              append={ "InputFile": [ "train_merge.sh", "finalqa.xml" ] },
+                         "SplitArguments": "%s 5" % inputfile_fqa},  # 5 is the stage number
+              append={ "InputFile": [ "train_merge.sh", inputfile_fqa ] },
               delete={ "NextStages", "JobRange" })
-  xml_fqa = get_alien_xml(os.path.join(jdl["OutputDir"], "QA_archive.zip"),
-                          jdl["JobRange"][0], jdl["JobRange"][1])
+  if inputfile_fqa.endswith(".xml"):
+    inputlist_fqa = get_alien_xml(os.path.join(jdl["OutputDir"], "QA_archive.zip"),
+                            jdl["JobRange"][0], jdl["JobRange"][1])
+  else:
+    pattern = preprocess_var(jdl["OutputDir"])
+    inputlist_fqa = "\n".join([ pattern % ji
+                                for ji in range(jdl["JobRange"][0], jdl["JobRange"][1]+1) ]) + "\n"
   all_inputs["FinalQA"] = jdl_fqa["InputFile"]
+  qap_inputs = [ "QAresults.root", "QAresults_merged.root", "QAresults_barrel.root",
+                 "QAresults_outer.root", "FilterEvents_Trees.root", "event_stat.root",
+                 "event_stat_barrel.root", "event_stat_outer.root" ] \
+                if jdl["DontArchive"] or jdl["SaveAll"] else \
+               [ "QA_merge_archive.zip" ]
   jdl_qap = get_preprocessed_jdl(args.jdl,
               override={ "Output": [ "qa_plots/*", "std*" ],
                          "OutputDir": os.path.join(os.path.dirname(jdl["OutputDir"]), "QAplots"),
                          "Executable": "qa_plots.sh",
-                         "SplitArguments": os.path.join(os.path.dirname(jdl["OutputDir"]), "QA_merge_archive.zip") },
+                         "SplitArguments": " ".join([ os.path.join(os.path.dirname(jdl["OutputDir"]), x) for x in qap_inputs ]) },
               append={ "InputFile": [ "qa_plots.sh" ] },
               delete={ "NextStages", "JobRange" })
   all_inputs["QAPlots"] = jdl_qap["InputFile"]
@@ -319,10 +351,10 @@ except OSError as e:
 
 # Create XML files and scripts for tiers > first
 if jdl_spc:
-  with open(os.path.join(args.work_dir, "spc.xml"), "w") as xml: xml.write(xml_spc)
+  with open(os.path.join(args.work_dir, "spc.xml"), "w") as f: f.write(xml_spc)
   gen_runjob(os.path.join(args.work_dir, "runspc.sh"), jdl_spc, args.dry_run)
 if jdl_fqa:
-  with open(os.path.join(args.work_dir, "finalqa.xml"), "w") as xml: xml.write(xml_fqa)
+  with open(os.path.join(args.work_dir, inputfile_fqa), "w") as f: f.write(inputlist_fqa)
   gen_runjob(os.path.join(args.work_dir, "runfinalqa.sh"), jdl_fqa, args.dry_run)
   gen_runjob(os.path.join(args.work_dir, "runqaplots.sh"), jdl_qap, args.dry_run)
 

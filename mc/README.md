@@ -151,6 +151,10 @@ ignored by AliEn.
   detectors. In order to expose it to the job you must add it to `JDLVariables`.
 * `QADetectorExclude`: exclude detectors from QA plots. Same format as
   `QADetectorInclude`. Has to be added to `JDLVariables` too.
+* `DontArchive`: set it to `1` to store output files, as specified in `Output`,
+  as they are, without compressing them. Useful for debug.
+* `SaveAll`: set it to `1` to save all files produced by jobs, ignoring `Output`
+  completely. Files will not be compressed in zip files. Useful for debug.
 
 
 Overriding JDL variables
