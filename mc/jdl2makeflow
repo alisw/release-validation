@@ -46,6 +46,10 @@ def preprocess_var(s):
 def gen_runjob(output_file, jdl, dry_run):
   runjob = j2env.from_string("""#!/bin/bash -e
 type zip unzip zipinfo
+{% for v in [ "LANG", "LANGUAGE", "LC_ALL", "LC_COLLATE", "LC_CTYPE", "LC_MESSAGES", \
+              "LC_MONETARY", "LC_NUMERIC", "LC_TIME", "LC_ALL" ] -%}
+export {{v}}=C
+{% endfor -%}
 JOBHASH=$(echo "$*" | sha1sum | awk '{print $1}')
 JOBID=$1
 DONEFILE="$PWD/$2"
