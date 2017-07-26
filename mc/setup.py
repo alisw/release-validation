@@ -5,7 +5,7 @@ import pypandoc
 
 setup(
   name='alien-jdl2makeflow',
-  version='0.0.4',
+  version='0.0.5',
   description='Run AliEn JDLs with Makeflow',
   long_description="\n".join([ l for l in pypandoc.convert_file("README.md", "rst").split("\n") if not "PyPI version" in l ]),
   url='https://github.com/alisw/release-validation',
