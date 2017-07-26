@@ -50,13 +50,14 @@ type zip unzip zipinfo
               "LC_MONETARY", "LC_NUMERIC", "LC_TIME", "LC_ALL" ] -%}
 export {{v}}=C
 {% endfor -%}
-JOBHASH=$(echo "$*" | sha1sum | awk '{print $1}')
 JOBID=$1
+JOBDIR=$(basename "$0")
+JOBDIR=job-${JOBDIR%.*}-$(printf %04d $JOBID)
 DONEFILE="$PWD/$2"
 shift 2
-rm -rf job-$JOBHASH
-mkdir job-$JOBHASH
-cd job-$JOBHASH
+rm -rf job-$JOBDIR
+mkdir job-$JOBDIR
+cd job-$JOBDIR
 INPUT_LIST=({% for x in input_list -%}
              "{{x}}"
              {% endfor %})
