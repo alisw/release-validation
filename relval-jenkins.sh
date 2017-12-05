@@ -149,21 +149,29 @@ set -x
 set +x
 
 # Check quota on EOS if appropriate.
-EOS_REQ_GB=${REQUIRED_SPACE_GB:=-1}
-if [[ $EOS_REQ_GB -ge 0 && "$(relvalvar baseOutputDirectory)" == */eos/* ]]; then
+EOS_REQ_GB=${REQUIRED_SPACE_GB:=0}
+EOS_REQ_FILES=${REQUIRED_FILES:=0}
+if [[ "$(relvalvar baseOutputDirectory)" == */eos/* ]]; then
   EOS_RE='\([a-z]\+://[^/]\+\)/\(.*$\)'
   EOS_HOST=$(relvalvar baseOutputDirectory | sed -e 's!'"$EOS_RE"'!\1!')
   EOS_PATH=$(relvalvar baseOutputDirectory | sed -e 's!'"$EOS_RE"'!\2!')
   EOS_QUOTA_RAW=$(relvalenv eos $EOS_HOST quota $EOS_PATH -m)
-  EOS_QUOTA=$(echo $EOS_QUOTA_RAW | grep uid= || true)
-  [[ -z "$EOS_QUOTA" ]] \
-    && EOS_FREE_GB=infinite \
-    || EOS_FREE_GB=$(eval $EOS_QUOTA; echo $(( ($maxbytes-$usedbytes)/1024/1024/1024 )) )
-    [[ -z "$EOS_QUOTA" || "$EOS_FREE_GB" -ge $EOS_REQ_GB ]] \
-      && echo "Free space on EOS: $EOS_FREE_GB GB (above $EOS_REQ_GB GB)." \
-      || { echo "Only $EOS_FREE_GB GB on EOS, but $EOS_REQ_GB GB required. Aborting."; exit 1; }
+  EOS_QUOTA=$(echo $EOS_QUOTA_RAW | grep uid= || true)  # validate output
+  if [[ $EOS_QUOTA ]]; then
+  (
+    eval $EOS_QUOTA
+    EOS_FREE_GB=$(( ($maxbytes-$usedbytes)/1024/1024/1024 ))
+    EOS_FREE_FILES=$(( $maxfiles-$usedfiles ))
+    echo "EOS free quota: $EOS_FREE_GB GB, $EOS_FREE_FILES inodes"
+    if [[ ($EOS_REQ_GB -gt 0 && $EOS_FREE_GB -lt $EOS_REQ_GB) ||
+          ($EOS_REQ_FILES -gt 0 && $EOS_FREE_FILES -lt $EOS_REQ_FILES) ]]; then
+      echo "FATAL: not enough EOS quota: requested $EOS_REQ_GB GB and $EOS_REQ_FILES inodes"
+      exit 1
+    fi
+  )
   else
-    echo ""
+    echo "WARNING: cannot get quota for $EOS_PATH on $EOS_HOST"
+  fi
 fi
 
 # Prepare dataset
