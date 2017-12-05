@@ -216,6 +216,7 @@ DETECTORS=(
   "Reconstruction:shahoian"
   "Calibration:zampolli"
   "DevOps:hristov dberzano eulisse"
+  "DPG:fprino miweber cristea"
 )
 
 JIRA_WATCHERS=($(for D in "${DETECTORS[@]}"; do echo ${D##*:}; done | xargs -n1 echo | sort -u))
