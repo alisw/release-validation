@@ -108,10 +108,12 @@ else {
         MAIN_PKG="${TAGS%%=*}"
         MAIN_VER=$(echo "$TAGS"|cut -d' ' -f1)
         MAIN_VER="${MAIN_VER#*=}"
+        FETCH_REPOS="$(aliBuild build --help | grep fetch-repos || true)"
         aliBuild --reference-sources /build/mirror                       \
                  --debug                                                 \
                  --work-dir "$WORKAREA/$WORKAREA_INDEX"                  \
                  --architecture "$BUILD_ARCH"                            \
+                 ${FETCH_REPOS:+--fetch-repos}                           \
                  --jobs 16                                               \
                  --remote-store "rsync://repo.marathon.mesos/store/::rw" \
                  ${DEFAULTS:+--defaults "$DEFAULTS"}                     \
