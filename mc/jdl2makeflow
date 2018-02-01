@@ -286,7 +286,7 @@ if "FinalQA" in jdl.get("NextStages", []):
                [ "QA_merge_archive.zip" ]
   jdl_qap = get_preprocessed_jdl(args.jdl,
               override={ "Output": [ "qa_plots/*", "std*" ],
-                         "OutputDir": os.path.join(os.path.dirname(jdl["OutputDir"]), "QAplots"),
+                         "OutputDir": os.path.join(os.path.dirname(jdl["OutputDir"]), "QAplots_passMC"),
                          "Executable": "qa_plots.sh",
                          "SplitArguments": " ".join([ os.path.join(os.path.dirname(jdl["OutputDir"]), x) for x in qap_inputs ]) },
               append={ "InputFile": [ "qa_plots.sh" ] },

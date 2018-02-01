@@ -6,6 +6,18 @@ export runNumber=${ALIEN_JDL_LPMANCHORRUN:=$ALIEN_JDL_LPMRUNNUMBER}
 DET_INCL=$ALIEN_JDL_QADETECTORINCLUDE
 DET_EXCL=$ALIEN_JDL_QADETECTOREXCLUDE
 
+# Form the output path suffix: <year>/<period>/passMC/<run>
+# <run> is the run number, not the anchor one
+if [[ $ALIEN_JDL_LPMPRODUCTIONTAG =~ ^LHC([0-9]{2}) ]]; then
+  YEAR=${BASH_REMATCH[1]}
+  [[ $YEAR < 90 ]] && YEAR=20$YEAR || YEAR=19$YEAR
+  PASS_DIR=$(printf "%d/%s/passMC/%09d" $YEAR $ALIEN_JDL_LPMPRODUCTIONTAG $ALIEN_JDL_LPMRUNNUMBER)
+  unset YEAR
+else
+  echo "Invalid value for ALIEN_JDL_LPMPRODUCTIONTAG: $ALIEN_JDL_LPMPRODUCTIONTAG, aborting"
+  exit 1
+fi
+
 while [[ $# -gt 0 ]]; do
   F="$PWD/$(basename "$1")"
   root -l -b <<EOF || true
@@ -47,7 +59,7 @@ for FILE in "${DETECTORS_PATH}"/*; do
   if [[ ( ! $DET_INCL || " $DET_INCL " == *\ $DET\ * ) && ( ! $DET_EXCL || ! " $DET_EXCL " == *\ $DET\ * ) ]]; then
     for FUNC in "${FUNCS[@]}"; do unset -f ${FUNC%%:*}; done
 
-    TMPQA=$PWD/qa_plots/$DET
+    TMPQA="$PWD/qa_plots/$DET/$PASS_DIR"
     mkdir -p "$TMPQA"
     pushd "$TMPQA" &> /dev/null
 
