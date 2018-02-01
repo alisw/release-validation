@@ -99,7 +99,7 @@ in a different way.
   be available to the job.
 * `Packages`: packages to be loaded in the Grid environment. They are expected
   from CVMFS, and CVMFS must be available locally. You can also use local
-  installations for testing, see `SourceEnvScript` below.
+  installations for testing, see `EnvironmentCommand` above.
 * `JDLVariables`: list of arbitrary variables from the JDL that will be exported
   in the job's environment. The variable name will be altered. If, for instance,
   you want to export the JDL variable `ArbitraryVar`, this will be available to
@@ -129,12 +129,12 @@ Extra JDL variables
 The following JDL variables are interpreted only by `jdl2makeflow` and will be
 ignored by AliEn.
 
-* `SourceEnvScript`: path to an environment script to be sourced in order to
-  load the required packages. If this script is defined, it will be
-  automatically loaded by each job, and `Packages` will be ignored. This is
-  useful for local development when one wants to test changes with a local
-  AliRoot build. If `SourceEnvScript` is specified, CVMFS is not required for
-  packages.
+* `EnvironmentCommand`: command to run in order to set the packages environment.
+  If defined, it will be automatically ran before each job (_i.e._ no need to
+  load the environment separately before running Makeflow), and `Packages` will
+  be ignored. This is useful for local development when one wants to test
+  changes with a local AliRoot build. If `EnvironmentCommand` is specified,
+  we can run without CVMFS.
 * `ExtraVariables`: same as `JDLVariables`, but the variables listed (which must
   be defined in the JDL) will be exported in the job environment as-is, with
   their name not manipulated. So, the variable `ArbitraryVar` will be exported
