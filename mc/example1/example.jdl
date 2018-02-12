@@ -11,19 +11,14 @@ Executable = "/alice/cern.ch/user/a/aliprod/bin/aliroot_dpgsim.sh";
 InputFile = {
 "LF:/alice/cern.ch/user/a/aliprod/LHC16h8a/Custom.cfg"
 };
-COMMENTEDOUT_InputFile_append = { "eos-proxy" };
 Split = "production:1-2308";
-Split_override = "production:1-16";
 SplitArguments = "--run 244411 --mode full --uid #alien_counter# --nevents 1 --generator Pythia8_Monash2013 --trigger Custom.cfg";
-SplitArguments_append = " --ocdb $OCDB_PATH";
 JDLPath = "/alice/cern.ch/user/a/aliprod/LHC16h8a/JDL3";
 JDLArguments = "244411 1 2308 0";
 COMMENT_QADetectorInclude = "ITS TPC";
 JDLProcessor = "alien.lpm.RunList";
 ValidationCommand = "/alice/validation/validation.sh";
 OutputDir = "/alice/sim/2016/LHC16h8a/244411/#alien_counter_03i#";
-OutputDir_override = "/tmp/mc_test/#alien_counter_04i#";
-COMMENTEDOUT_OutputDir_override = "root://eospublic.cern.ch//eos/experiment/alice/release-validation/output/montecarlo_test/#alien_counter_04i#";
 Output = {
 "log_archive:stderr.log,stdout.log,tag.log,sim.log,rec.log,qa.log,aod.log,simwatch.log,recwatch.log@disk=1",
 "root_archive.zip:pyxsec.root,galice.root,Kinematics.root,TrackRefs.root,Trigger.root,AliESDs.root,AliESDfriends.root,Run*.root,ITS.RecPoints.root@disk=1",
@@ -54,17 +49,7 @@ JDLVariables = {
 "LPMJobTypeID",
 "QADetectorInclude"
 };
-ExtraVariables = {
-  "ALICE_DATA",
-  "X509_USER_PROXY",
-  "OCDB_PATH",
-  "CONFIG_OCDB"
-};
 NextStages = { "FinalQA", "MergeFilteredTrees" };
-ALICE_DATA = "/cvmfs/alice.cern.ch/data/analysis/2017/vAN-20170620";
-OCDB_PATH = "/cvmfs/alice-ocdb.cern.ch";
-CONFIG_OCDB = "cvmfs";
-X509_USER_PROXY = "$PWD/eos-proxy";
 LPMRunNumber = "244411";
 LPMMetaData = "Packages=[VO_ALICE@AliDPG::v5-08-XX-15, VO_ALICE@AliPhysics::v5-08-13o-01-1, VO_ALICE@jemalloc::v3.6.0];OutputDir=/alice/sim/2016/LHC16h8a/244411/#alien_counter_03i#;LPMRunNumber=244411;LPMProductionType=MC;LPMInteractionType=pp;LPMProductionTag=LHC16h8a;LPMAnchorRun=244411;LPMAnchorProduction=LHC15n;LPMAnchorYear=2015;LPMJobTypeID=9393";
 LPMProductionType = "MC";
@@ -78,3 +63,19 @@ OCDBReferenceProduction = "9529";
 PWG = "COMMON";
 InputDataType = "NONE";
 Activity = "SIM";
+
+COMMENT = "The rest of the file (apart from the SplitArguments number of evts) was not changed";
+InputFile_append = { "eos-proxy" };
+Split_override = "production:1-16";
+SplitArguments_append = " --ocdb $OCDB_PATH";
+X509_USER_PROXY = "$PWD/eos-proxy";
+CONFIG_OCDB = "cvmfs";
+OCDB_PATH = "/cvmfs/alice-ocdb.cern.ch";
+ALICE_DATA = "/cvmfs/alice.cern.ch/data/analysis/2017/vAN-20170620";
+ExtraVariables = {
+  "ALICE_DATA",
+  "X509_USER_PROXY",
+  "OCDB_PATH",
+  "CONFIG_OCDB"
+};
+OutputDir_override = "root://eospublic.cern.ch//eos/experiment/alice/release-validation/output/mctest001/#alien_counter_04i#";
