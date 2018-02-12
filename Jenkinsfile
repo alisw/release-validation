@@ -203,9 +203,29 @@ node("$RUN_ARCH-relval") {
         rm -rf release-validation/
         git clone "https://github.com/$RELVAL_REPO" ${RELVAL_BRANCH:+-b "$RELVAL_BRANCH"} release-validation/
 
-        echo "We will be using AliPhysics $ALIPHYSICS_VERSION with the following environment"
-        env
-        release-validation/relval-jenkins.sh
+        if [[ $RUN_MC_VALIDATION == true ]]; then
+          # Run AliDPG-based Monte Carlo validation based on examples
+          RELVAL_NAME="MC-AliPhysics-${ALIPHYSICS_VERSION}-${RELVAL_TIMESTAMP}"
+          export PYTHONUSERBASE=$PWD/python
+          export PATH=$PYTHONUSERBASE/bin:$PATH
+          rm -rf python && mkdir python
+          pip install --user release-validation/mc
+
+          # Use an example and modify it
+          sed -e "s/gpmc001/$RELVAL_NAME/" "release-validation/mc/examples/gpmc_LHC17m/"*.jdl > mcval.jdl
+          cat mcval.jdl
+
+          # Credentials and Config.cfg
+          cp -v /secrets/eos-proxy .
+          cp -v release-validation/mc/examples/gpmc_LHC17m/Custom.cfg .
+
+          # Run it right away
+          jdl2makeflow --force --run mcval.jdl -T wq -N alirelval_${RELVAL_NAME} -r 3 -C wqcatalog.marathon.mesos:9097
+        else
+          echo "We will be using AliPhysics $ALIPHYSICS_VERSION with the following environment"
+          env
+          release-validation/relval-jenkins.sh
+        fi
       '''
     }
   }
