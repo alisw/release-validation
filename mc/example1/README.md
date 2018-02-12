@@ -44,14 +44,15 @@ Workflow
 --------
 
 Workflow is constituted by several ALICE MC jobs (doing everything up to the AOD filtering). After
-that, the Final QA is run, and the merging of the Space Point Calibration.
+that, the Final QA is run, and the filtered trees merging.
 
-Space point calibration merging simply merges ROOT files called `FilterEvents_Trees.root` produced
-by every MC job. Output is found under:
+Filtered trees merging simply merges ROOT files called `FilterEvents_Trees.root` produced by every
+MC job. Output is found under:
 
-    SpacePointCalibrationMerge/spcm_archive.zip
+    SpacePointCalibrationMerge/001/spcm_archive.zip
 
-which, in turn, contains the merged ROOT file.
+which, in turn, contains the merged ROOT file. The `SpacePointCalibrationMerge` name is there for
+historical reasons even if no space point calibration is performed in Monte Carlos.
 
 The Final QA stage runs the merging for single jobs QA results, and also runs the plots generation.
 
