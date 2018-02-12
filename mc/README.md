@@ -187,6 +187,18 @@ or, you need to provide the input directory with credential informations:
     InputFile = { "LF:/alice/cern.ch/user/a/aliprod/LHC16h8a/Custom.cfg" };
     InputFile_append = { "my-proxy" };
 
+In case you need to change parte of a JDL string variable, you can use `_replace` too like the
+following:
+
+    SplitArguments = "--mode full --nevents 400 --generator Pythia8_Monash2013";
+    SplitArguments_replace = { "--nevents\\s[0-9]+",
+                               "--nevents 1 --ocdb $OCDB_PATH" };
+
+The `_replace` variable is an array with two string elements. The first element is the regular
+expression to match, whereas the second is the string replacing the match. First and second args
+behave exactly like the _pattern_ and _repl_ arguments of Python's
+[`re.sub`](https://docs.python.org/3/library/re.html#re.sub).
+
 
 Bugs and issues
 ---------------
