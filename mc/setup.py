@@ -1,16 +1,22 @@
 from setuptools import setup, find_packages
 from codecs import open
 from os import path
-import pypandoc
+try:
+  import pypandoc
+  def readme_to_rst():
+    return "\n".join([ l for l in pypandoc.convert_file("README.md", "rst").split("\n") if not "PyPI version" in l ])
+except ImportError:
+  def readme_to_rst():
+    return ""
 
 setup(
   name='alien-jdl2makeflow',
-  version='0.0.5',
+  version='0.0.6',
   description='Run AliEn JDLs with Makeflow',
-  long_description="\n".join([ l for l in pypandoc.convert_file("README.md", "rst").split("\n") if not "PyPI version" in l ]),
+  long_description=readme_to_rst(),
   url='https://github.com/alisw/release-validation',
   author='Matteo Concas and Dario Berzano',
-  author_email='matteo.concas@cern.ch',
+  author_email='dario.berzano@cern.ch',
   license='GPL',
   classifiers=[
 
