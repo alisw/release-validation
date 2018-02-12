@@ -1,11 +1,13 @@
-Example: a full ALICE Monte Carlo simulation
-============================================
+Examples
+========
 
-This directory contains the following files:
+This directory contains JDLs for two general purpose Monte Carlos:
 
-* `example.jdl`: the JDL describing our Monte Carlo job derived from [an actual ALICE Monte Carlo
-    production](https://alice.its.cern.ch/jira/browse/ALIROOT-6827)
-* `Custom.cfg`: a Monte Carlo configuration file imported from AliEn (see the JDL)
+* `gpmc_LHC15n` (anchored to LHC15n)
+* `gpmc_LHC17m` (anchored to LHC17m)
+
+Every directory contains a JDL file (the original one running on the Grid, plus additional
+information for local runs at the end), plus a `Custom.cfg` file for triggers, imported from AliEn.
 
 
 Requirements
