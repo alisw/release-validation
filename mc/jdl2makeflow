@@ -243,10 +243,10 @@ all_inputs = {}
 jdl = get_preprocessed_jdl(args.jdl)
 all_inputs["Jobs"] = jdl["InputFile"]
 
-# Second tier of jobs: Space Point Calibration
-jdl_spc = {}
-if "SpacePointCalibration" in jdl.get("NextStages", []):
-  jdl_spc = get_preprocessed_jdl(args.jdl,
+# Second tier of jobs: merging of filtered trees
+jdl_mft = {}
+if "MergeFilteredTrees" in jdl.get("NextStages", []):
+  jdl_mft = get_preprocessed_jdl(args.jdl,
               override={ "Output": [ "spcm_archive.zip:pyxsec*.root,AODQA.root,AliAOD*.root,FilterEvents_Trees*.root,*.stat*,EventStat_temp*.root,Residual*.root,TOFcalibTree.root,std*,fileinfo*.log@disk=2" ],
                          "OutputDir": os.path.join(os.path.dirname(jdl["OutputDir"]),
                                                    "SpacePointCalibrationMerge",
@@ -255,9 +255,9 @@ if "SpacePointCalibration" in jdl.get("NextStages", []):
                          "SplitArguments": "" },
               append={ "InputFile": [ "spc_merge.sh", "spc_merge.C", "spc.xml" ] },
               delete={ "NextStages", "JobRange" })
-  xml_spc = get_alien_xml(os.path.join(jdl["OutputDir"], "FilterEvents_Trees.root"),
+  xml_mft = get_alien_xml(os.path.join(jdl["OutputDir"], "FilterEvents_Trees.root"),
                           jdl["JobRange"][0], jdl["JobRange"][1])
-  all_inputs["SpacePointCalibration"] = jdl_spc["InputFile"]
+  all_inputs["MergeFilteredTrees"] = jdl_mft["InputFile"]
 
 # Second tier of jobs: FinalQA
 jdl_fqa = {}
@@ -296,9 +296,9 @@ if "FinalQA" in jdl.get("NextStages", []):
 if args.parse_jdl:
   print("# First tier of jobs")
   print(json.dumps(jdl, indent=2))
-  if jdl_spc:
-    print("\n# Space Point Calibration")
-    print(json.dumps(jdl_spc, indent=2))
+  if jdl_mft:
+    print("\n# Merging of filtered trees")
+    print(json.dumps(jdl_mft, indent=2))
   if jdl_fqa:
     print("\n# Final QA")
     print(json.dumps(jdl_fqa, indent=2))
@@ -353,9 +353,9 @@ except OSError as e:
   exit(1)
 
 # Create XML files and scripts for tiers > first
-if jdl_spc:
-  with open(os.path.join(args.work_dir, "spc.xml"), "w") as f: f.write(xml_spc)
-  gen_runjob(os.path.join(args.work_dir, "runspc.sh"), jdl_spc, args.dry_run)
+if jdl_mft:
+  with open(os.path.join(args.work_dir, "spc.xml"), "w") as f: f.write(xml_mft)
+  gen_runjob(os.path.join(args.work_dir, "runspc.sh"), jdl_mft, args.dry_run)
 if jdl_fqa:
   with open(os.path.join(args.work_dir, inputfile_fqa), "w") as f: f.write(inputlist_fqa)
   gen_runjob(os.path.join(args.work_dir, "runfinalqa.sh"), jdl_fqa, args.dry_run)
@@ -386,9 +386,9 @@ job{{ "%04d"|format(jobindex) }}.done: runjob.sh {{input_list["Jobs"]|join(" ")}
 	./runjob.sh {{jobindex}} job{{"%04d"|format(jobindex)}}.done
 {% endfor -%}
 
-{% if "SpacePointCalibration" in next_stages -%}
-spc.done: runspc.sh {{input_list["SpacePointCalibration"]|join(" ")}}{% for jobindex in range(joba,jobb) %} job{{"%04d"|format(jobindex)}}.done{% endfor %}
-	./runspc.sh 0 spc.done
+{% if "MergeFilteredTrees" in next_stages -%}
+mergefilteredtrees.done: runspc.sh {{input_list["MergeFilteredTrees"]|join(" ")}}{% for jobindex in range(joba,jobb) %} job{{"%04d"|format(jobindex)}}.done{% endfor %}
+	./runspc.sh 0 mergefilteredtrees.done
 {% endif -%}
 
 {% if "FinalQA" in next_stages -%}
@@ -417,7 +417,7 @@ if args.start_at in [ "merge", "qaplots" ]:
   for jobindex in range(jdl["JobRange"][0], jdl["JobRange"][1]+1):
     open(os.path.join(args.work_dir, "job%04d.done"%jobindex), "w").close()
 if args.start_at == "qaplots":
-  for done in [ "finalqa.done", "spc.done" ]:
+  for done in [ "finalqa.done", "mergefilteredtrees.done" ]:
     open(os.path.join(args.work_dir, done), "w").close()
 
 # Run Makeflow in dryrun mode to pretend we have completed the earlier stages
