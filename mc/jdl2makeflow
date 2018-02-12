@@ -258,7 +258,7 @@ if "MergeFilteredTrees" in jdl.get("NextStages", []):
                          "Executable": "spc_merge.sh",
                          "SplitArguments": "" },
               append={ "InputFile": [ "spc_merge.sh", "spc_merge.C", "spc.xml" ] },
-              delete={ "NextStages", "JobRange" })
+              delete=[ "NextStages", "JobRange" ])
   xml_mft = get_alien_xml(os.path.join(jdl["OutputDir"], "FilterEvents_Trees.root"),
                           jdl["JobRange"][0], jdl["JobRange"][1])
   all_inputs["MergeFilteredTrees"] = jdl_mft["InputFile"]
@@ -274,7 +274,7 @@ if "FinalQA" in jdl.get("NextStages", []):
                          "Executable": "train_merge.sh",
                          "SplitArguments": "%s 5" % inputfile_fqa},  # 5 is the stage number
               append={ "InputFile": [ "train_merge.sh", inputfile_fqa ] },
-              delete={ "NextStages", "JobRange" })
+              delete=[ "NextStages", "JobRange" ])
   if inputfile_fqa.endswith(".xml"):
     inputlist_fqa = get_alien_xml(os.path.join(jdl["OutputDir"], "QA_archive.zip"),
                             jdl["JobRange"][0], jdl["JobRange"][1])
@@ -294,7 +294,7 @@ if "FinalQA" in jdl.get("NextStages", []):
                          "Executable": "qa_plots.sh",
                          "SplitArguments": " ".join([ os.path.join(os.path.dirname(jdl["OutputDir"]), x) for x in qap_inputs ]) },
               append={ "InputFile": [ "qa_plots.sh" ] },
-              delete={ "NextStages", "JobRange" })
+              delete=[ "NextStages", "JobRange" ])
   all_inputs["QAPlots"] = jdl_qap["InputFile"]
 
 if args.parse_jdl:
