@@ -50,7 +50,8 @@ else {
         ALIDIST_REPO="${ALIDIST%:*}"
         [[ $ALIDIST_BRANCH == $ALIDIST ]] && ALIDIST_BRANCH= || true
         rm -rf alidist
-        git clone "https://github.com/$ALIDIST_REPO" ${ALIDIST_BRANCH:+-b "$ALIDIST_BRANCH"} alidist/
+        git clone ${ALIDIST_BRANCH:+-b "$ALIDIST_BRANCH"} "https://github.com/$ALIDIST_REPO" alidist/ || \
+          { git clone "https://github.com/$ALIDIST_REPO" alidist/ && pushd alidist && git checkout "$ALIDIST_BRANCH" && popd; }
         for TAG in $TAGS; do
           VER="${TAG##*=}"
           PKG="${TAG%=*}"
@@ -62,8 +63,14 @@ else {
           mv "alidist/$PKGLOW.sh.0" "alidist/$PKGLOW.sh"
           git ls-remote --tags "$REPO" | grep "refs/tags/$VER\\$" && { echo "Tag $VER on $PKG exists - skipping"; continue; } || true
           rm -rf "$PKG/"
-          git clone --reference /build/mirror/$PKGLOW "$REPO" "$PKG/"
+          git clone $([[ -d /build/mirror/$PKGLOW ]] && echo "--reference /build/mirror/$PKGLOW") "$REPO" "$PKG/"
           pushd "$PKG/"
+            if [[ $PKG == AliDPG ]]; then
+              DPGBRANCH="${VER%-XX-*}"
+              [[ $DPGBRANCH != $VER ]] || { echo "Cannot determine AliDPG branch to tag from $VER - aborting"; exit 1; }
+              DPGBRANCH="${DPGBRANCH}-XX"
+              git checkout "$DPGBRANCH"
+            fi
             git tag "$VER"
             git push origin "$VER"
           popd
@@ -104,20 +111,21 @@ else {
         mkdir -p $WORKAREA/$WORKAREA_INDEX
         echo $NODE_NAME > $WORKAREA/$WORKAREA_INDEX/current_slave
 
-        # Actual build
-        MAIN_PKG="${TAGS%%=*}"
-        MAIN_VER=$(echo "$TAGS"|cut -d' ' -f1)
-        MAIN_VER="${MAIN_VER#*=}"
+        # Actual build of all packages from TAGS
         FETCH_REPOS="$(aliBuild build --help | grep fetch-repos || true)"
-        aliBuild --reference-sources /build/mirror                       \
-                 --debug                                                 \
-                 --work-dir "$WORKAREA/$WORKAREA_INDEX"                  \
-                 --architecture "$BUILD_ARCH"                            \
-                 ${FETCH_REPOS:+--fetch-repos}                           \
-                 --jobs 16                                               \
-                 --remote-store "rsync://repo.marathon.mesos/store/::rw" \
-                 ${DEFAULTS:+--defaults "$DEFAULTS"}                     \
-                 build "$MAIN_PKG" || BUILDERR=$?
+        for PKG in $TAGS; do
+          BUILDERR=
+          aliBuild --reference-sources /build/mirror                       \
+                   --debug                                                 \
+                   --work-dir "$WORKAREA/$WORKAREA_INDEX"                  \
+                   --architecture "$BUILD_ARCH"                            \
+                   ${FETCH_REPOS:+--fetch-repos}                           \
+                   --jobs 16                                               \
+                   --remote-store "rsync://repo.marathon.mesos/store/::rw" \
+                   ${DEFAULTS:+--defaults "$DEFAULTS"}                     \
+                   build "${PKG%%=*}" || BUILDERR=$?
+          [[ $BUILDERR ]] && break || true
+        done
         rm -f "$WORKAREA/$WORKAREA_INDEX/current_slave"
         [[ "$BUILDERR" ]] && exit $BUILDERR || true
       '''
@@ -144,41 +152,47 @@ node("$RUN_ARCH-relval") {
       CVMFS_SIGNAL="/tmp/${CVMFS_NAMESPACE}.cern.ch.cvmfs_reload /build/workarea/wq/${CVMFS_NAMESPACE}.cern.ch.cvmfs_reload"
       mkdir -p /build/workarea/wq || true
       while [[ $SW_COUNT -lt $SW_MAXCOUNT ]]; do
-        /cvmfs/${CVMFS_NAMESPACE}.cern.ch/bin/alienv q | grep -E VO_ALICE@"$MAIN_PKG"::"$MAIN_VER"-'[0-9]' && { echo "Package published"; FOUND=1; break; }
-        echo "Not found"
+        ALL_FOUND=1
+        for PKG in $TAGS; do
+          /cvmfs/${CVMFS_NAMESPACE}.cern.ch/bin/alienv q | \
+            grep -E VO_ALICE@"${PKG%%=*}"::"${PKG#*=}" || { ALL_FOUND= ; break; }
+        done
+        [[ $ALL_FOUND ]] && { echo "All packages ($TAGS) published"; break; } || true
         for S in $CVMFS_SIGNAL; do
           [[ -e $S ]] && true || touch $S
         done
         sleep 1
         SW_COUNT=$((SW_COUNT+1))
       done
-      [[ $FOUND ]] && true || { "Timeout waiting for publishing"; exit 1; }
+      [[ $ALL_FOUND ]] && true || { "Timeout while waiting for packages to be published"; exit 1; }
     '''
   }
 
   stage "Checking framework"
-  sh '''
-    set -e
-    set -o pipefail
-    curl -X DELETE -H "Content-type: application/json" "http://leader.mesos:8080/v2/apps/wqmesos/tasks?scale=true"
-    curl -X DELETE -H "Content-type: application/json" "http://leader.mesos:8080/v2/apps/wqcatalog/tasks?scale=true"
-    curl -X PUT -H "Content-type: application/json" --data '{ "instances": 1 }' "http://leader.mesos:8080/v2/apps/wqcatalog?force=true"
-    sleep 90
-    curl -X PUT -H "Content-type: application/json" --data '{ "instances": 1 }' "http://leader.mesos:8080/v2/apps/wqmesos?force=true"
-  '''
+  if ("$SKIP_CHECK_FRAMEWORK" == "true") {
+    println("Skipping as per user request")
+  }
+  else {
+    sh '''
+      set -e
+      set -o pipefail
+      curl -X DELETE -H "Content-type: application/json" "http://leader.mesos:8080/v2/apps/wqmesos/tasks?scale=true"
+      curl -X DELETE -H "Content-type: application/json" "http://leader.mesos:8080/v2/apps/wqcatalog/tasks?scale=true"
+      curl -X PUT -H "Content-type: application/json" --data '{ "instances": 1 }' "http://leader.mesos:8080/v2/apps/wqcatalog?force=true"
+      sleep 90
+      curl -X PUT -H "Content-type: application/json" --data '{ "instances": 1 }' "http://leader.mesos:8080/v2/apps/wqmesos?force=true"
+    '''
+  }
 
   stage "Validating"
-  withEnv(["RELVAL_ALIPHYSICS_REF=$RELVAL_ALIPHYSICS_REF",
-           "LIMIT_FILES=$LIMIT_FILES",
+  withEnv(["LIMIT_FILES=$LIMIT_FILES",
            "LIMIT_EVENTS=$LIMIT_EVENTS",
            "CVMFS_NAMESPACE=$CVMFS_NAMESPACE",
            "DATASET=$DATASET",
            "MONKEYPATCH_TARBALL_URL=$MONKEYPATCH_TARBALL_URL",
            "REQUIRED_SPACE_GB=$REQUIRED_SPACE_GB",
            "REQUIRED_FILES=$REQUIRED_FILES",
-           "EXTRA_VARIABLES=$EXTRA_VARIABLES",
            "JIRA_ISSUE=$JIRA_ISSUE",
-           "SUMMARIZE_ONLY=$SUMMARIZE_ONLY",
            "RELVAL_TIMESTAMP=$RELVAL_TIMESTAMP",
            "TAGS=$TAGS"]) {
     withCredentials([[$class: 'UsernamePasswordMultiBinding',
@@ -188,6 +202,9 @@ node("$RUN_ARCH-relval") {
       sh '''
         set -e
         set -o pipefail
+
+        echo TESTING, STOP NOW
+        exit 0
 
         MAIN_PKG="${TAGS%%=*}"
         [[ $MAIN_PKG == AliPhysics ]]
@@ -204,6 +221,9 @@ node("$RUN_ARCH-relval") {
         git clone "https://github.com/$RELVAL_REPO" ${RELVAL_BRANCH:+-b "$RELVAL_BRANCH"} release-validation/
 
         if [[ $RUN_MC_VALIDATION == true ]]; then
+          # Prerequisite (workaround)
+          yum install -y libxslt-devel
+
           # Run AliDPG-based Monte Carlo validation based on examples
           RELVAL_NAME="MC-AliPhysics-${ALIPHYSICS_VERSION}-${RELVAL_TIMESTAMP}"
           export PYTHONUSERBASE=$PWD/python
