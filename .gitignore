@@ -1,5 +1,5 @@
 *.pyc
-/example/work*
+/examples/*/work*
 /*egg-info
 /dist
 /build
