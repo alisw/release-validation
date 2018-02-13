@@ -75,8 +75,12 @@ for ((I=0; I<$MAXWAIT; I++)); do
   mkdir $LOCKDIR &> /dev/null && break || true
   sleep 0.1 || sleep 1
 done
+set +e
 {{env_cmd}}
+ENV_RV=$?
+set -e
 rmdir $LOCKDIR
+[[ $ENV_RV == 0 ]] || exit 3
 {% else -%}
 eval $(/cvmfs/alice.cern.ch/bin/alienv printenv {{packages|join(",")}})
 {% endif -%}
