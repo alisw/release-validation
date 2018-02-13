@@ -7,7 +7,6 @@ from jdl2makeflow_helpers import classad
 import re, os, errno
 from shutil import copy2, rmtree
 from argparse import ArgumentParser, REMAINDER
-from lxml import etree
 import subprocess
 
 lib_path = os.path.abspath(os.path.dirname(jdl2makeflow_helpers.__file__))
@@ -163,12 +162,17 @@ touch $DONEFILE
 
 def get_alien_xml(pattern, joba, jobb):
   pattern = preprocess_var(pattern)
-  root = etree.Element("alien")
-  coll = etree.SubElement(root, "collection", name="alien_collection.xml")
-  for evt in range(joba,jobb+1):
-    evnt = etree.SubElement(coll, "event", name=str(evt))
-    tfil = etree.SubElement(evnt, "file", turl=pattern % evt, type="f")
-  return etree.tostring(root, pretty_print=True)
+  axml = j2env.from_string("""
+<alien>
+  <collection name="alien_collection.xml">
+    {%- for evt in range(joba,jobb+1) %}
+    <event name="{{evt}}">
+      <file turl="{{pattern|format(evt)}}" type="f"/>
+    </event>{% endfor %}
+  </collection>
+</alien>
+""")
+  return axml.render(joba=joba, jobb=jobb, pattern=pattern)
 
 def get_preprocessed_jdl(jdl_fn, override={}, append={}, delete=[]):
   jdl = classad.parse(open(jdl_fn).read(), ignore_errors=True)

@@ -53,7 +53,7 @@ setup(
   # your project is installed. For an analysis of "install_requires" vs pip's
   # requirements files see:
   # https://packaging.python.org/en/latest/requirements.html
-  install_requires=[],
+  install_requires=[ "jinja2" ],
 
   python_requires='>=2.7',
 
@@ -69,7 +69,7 @@ setup(
   # have to be included in MANIFEST.in as well.
   include_package_data=True,
   package_data={
-    "jdl2makeflow_helpers": [ "spc_merge.C", "spc_merge.sh", "train_merge.sh", "qa_plot.sh" ]
+    "jdl2makeflow_helpers": [ "spc_merge.C", "spc_merge.sh", "train_merge.sh", "qa_plots.sh" ]
   },
 
   # Although 'package_data' is the preferred approach, in some case you may
