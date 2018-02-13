@@ -155,6 +155,9 @@ ignored by AliEn.
   as they are, without compressing them. Useful for debug.
 * `SaveAll`: set it to `1` to save all files produced by jobs, ignoring `Output`
   completely. Files will not be compressed in zip files. Useful for debug.
+* `NoLiveOutput`: set it to `1` to save output on files only, without seeing
+  what happens while it does. This is useful if we want to prevent Makeflow from
+  showing confusing output from all running jobs on the same terminal.
 
 
 Overriding JDL variables

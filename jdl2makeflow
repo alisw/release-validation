@@ -105,8 +105,8 @@ type "$PROG" &> /dev/null || PROG="$ALIDPG_ROOT/bin/{{executable|basename()}}"
 type "$PROG" &> /dev/null || PROG="./{{executable|basename()}}"
 MAINERR=0
 { env; echo + $PROG $* $ARGS; } >> stdout.log
-$PROG "$@" $ARGS  > >(tee -a stdout.log) \\
-                 2> >(tee -a stderr.log) || MAINERR=$?
+$PROG "$@" $ARGS  > >(tee -a stdout.log{% if no_live_out %} &> /dev/null{% endif %}) \\
+                 2> >(tee -a stderr.log{% if no_live_out %} &> /dev/null{% endif %}) || MAINERR=$?
 {% endif -%}
 [[ $MAINERR != 0 ]] && echo "Exited with errors ($MAINERR)" || echo "Exited with no errors";
 { echo + $PROG $* $ARGS " exited with $MAINERR"; } >> stdout.log
@@ -158,6 +158,7 @@ touch $DONEFILE
                            input_list  = jdl["InputFile"],
                            packages    = jdl["Packages"],
                            env_cmd     = jdl.get("EnvironmentCommand", None),
+                           no_live_out = jdl["NoLiveOutput"],
                            environment = jdl["Environment"],
                            dry_run     = dry_run,
                            executable  = jdl["Executable"],
@@ -238,11 +239,14 @@ def get_preprocessed_jdl(jdl_fn, override={}, append={}, delete=[]):
   else:
     jdl["SaveAll"] = False
 
+  # No live output (convert to boolean)
+  jdl["NoLiveOutput"] = jdl.get("NoLiveOutput", None) == "1"
+
   # Remove unneeded variables (cleanup)
   all_vars = jdl.keys()
   whitelist = [ "SplitArguments", "Executable", "Packages", "JobRange", "JobRange", "Output",
                 "InputFile", "Environment", "NextStages", "OutputDir", "EnvironmentCommand",
-                "SaveAll", "DontArchive" ] + \
+                "SaveAll", "DontArchive", "NoLiveOutput" ] + \
               override.keys() + append.keys()
   for k in all_vars:
     if k in delete or k not in whitelist:
