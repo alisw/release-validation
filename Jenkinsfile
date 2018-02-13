@@ -193,6 +193,7 @@ node("$RUN_ARCH-relval") {
            "REQUIRED_SPACE_GB=$REQUIRED_SPACE_GB",
            "REQUIRED_FILES=$REQUIRED_FILES",
            "JIRA_ISSUE=$JIRA_ISSUE",
+           "JDL_TO_RUN=$JDL_TO_RUN",
            "RELVAL_TIMESTAMP=$RELVAL_TIMESTAMP",
            "TAGS=$TAGS"]) {
     withCredentials([[$class: 'UsernamePasswordMultiBinding',
@@ -201,51 +202,84 @@ node("$RUN_ARCH-relval") {
                       passwordVariable: 'JIRA_PASS']]) {
       sh '''
         set -e
+        set +x
         set -o pipefail
+        hostname -f
 
-        echo TESTING, STOP NOW
-        exit 0
+        # Reset locale
+        for V in LANG LANGUAGE LC_ALL LC_COLLATE LC_CTYPE LC_MESSAGES LC_MONETARY \
+                 LC_NUMERIC LC_TIME LC_ALL; do
+          export $V=C
+        done
 
-        MAIN_PKG="${TAGS%%=*}"
-        [[ $MAIN_PKG == AliPhysics ]]
-        MAIN_VER=$(echo "$TAGS"|cut -d' ' -f1)
-        MAIN_VER="${MAIN_VER#*=}"
-        ALIPHYSICS_VERSION=$(/cvmfs/${CVMFS_NAMESPACE}.cern.ch/bin/alienv q | grep -E VO_ALICE@"$MAIN_PKG"::"$MAIN_VER"-'[0-9]$' | sort -V | tail -n1)
-        export ALIPHYSICS_VERSION="${ALIPHYSICS_VERSION##*:}"
-        [[ $ALIPHYSICS_VERSION ]]
+        # Define a unique name for the Release Validation
+        RELVAL_NAME="${TAGS//=/-}-${RELVAL_TIMESTAMP}"
+        RELVAL_NAME="${RELVAL_NAME// /_}"
+        OUTPUT_URL="https://ali-ci.cern.ch/release-validation/$RELVAL_NAME"
+        OUTPUT_XRD="root://eospublic.cern.ch//eos/experiment/alice/release-validation/output"
+        echo "Release Validation output on $OUTPUT_URL -- on XRootD: $OUTPUT_XRD"
 
+        # Select the appropriate versions of software to load from CVMFS. We have some workaround
+        # to prevent loading AliRoot if AliPhysics is there
+        ALIENV_PKGS=
+        HAS_ALIPHYSICS=$(echo $TAGS | grep AliPhysics || true)
+        for PKG in $TAGS; do
+          [[ $HAS_ALIPHYSICS && ${PKG%%=*} == AliRoot ]] && continue || true
+          ALIENV_PKGS="${ALIENV_PKGS} $(/cvmfs/${CVMFS_NAMESPACE}.cern.ch/bin/alienv q | \
+            grep -E VO_ALICE@"${PKG%%=*}"::"${PKG#*=}" | sort -V | tail -n1)"
+        done
+        ALIENV_PKGS=$(echo $ALIENV_PKGS)
+        echo "We will be loading from /cvmfs/${CVMFS_NAMESPACE}.cern.ch the following packages: ${ALIENV_PKGS}"
+
+        # Install the release-validation package
         RELVAL_BRANCH="${RELVAL##*:}"
         RELVAL_REPO="${RELVAL%:*}"
         [[ $RELVAL_BRANCH == $RELVAL ]] && RELVAL_BRANCH= || true
         rm -rf release-validation/
         git clone "https://github.com/$RELVAL_REPO" ${RELVAL_BRANCH:+-b "$RELVAL_BRANCH"} release-validation/
+        export PYTHONUSERBASE=$PWD/python
+        export PATH=$PYTHONUSERBASE/bin:$PATH
+        rm -rf python && mkdir python
+        pip install --user release-validation/
 
-        if [[ $RUN_MC_VALIDATION == true ]]; then
-          # Prerequisite (workaround)
-          yum install -y libxslt-devel
+        # Copy credentials and check validity (assume they are under /secrets). Credentials should
+        # be valid for 7 more days from now (we don't want them to expire while we are validating)
+        openssl x509 -in /secrets/eos-proxy -noout -subject -enddate -checkend $((86400*7)) || \
+          { echo "EOS credentials are no longer valid."; exit 1; }
 
-          # Run AliDPG-based Monte Carlo validation based on examples
-          RELVAL_NAME="MC-AliPhysics-${ALIPHYSICS_VERSION}-${RELVAL_TIMESTAMP}"
-          export PYTHONUSERBASE=$PWD/python
-          export PATH=$PYTHONUSERBASE/bin:$PATH
-          rm -rf python && mkdir python
-          pip install --user release-validation/mc
+        # Source utilities file
+        source release-validation/relval-jenkins.sh
 
-          # Use an example and modify it
-          sed -e "s/gpmc001/$RELVAL_NAME/" "release-validation/mc/examples/gpmc_LHC17m/"*.jdl > mcval.jdl
-          cat mcval.jdl
+        # Check EOS quota
+        export X509_CERT_DIR="/cvmfs/grid.cern.ch/etc/grid-security/certificates"
+        export X509_USER_PROXY=$PWD/eos-proxy
+        eos_check_quota "$OUTPUT_XRD" "$REQUIRED_SPACE_GB" "$REQUIRED_FILES"
 
-          # Credentials and Config.cfg
-          cp -v /secrets/eos-proxy .
-          cp -v release-validation/mc/examples/gpmc_LHC17m/Custom.cfg .
+        # Determine the JDL to use
+        cd release-validation/examples/$JDL_TO_RUN
+        JDL=$(echo *.jdl)
+        [[ -e $JDL ]] || { echo "Cannot find a JDL"; exit 1; }
+        cp -v /secrets/eos-proxy .  # fetch EOS proxy in workdir
 
-          # Run it right away
-          jdl2makeflow --force --run mcval.jdl -T wq -N alirelval_${RELVAL_NAME} -r 3 -C wqcatalog.marathon.mesos:9097
+        if grep -q 'aliroot_dpgsim.sh' "$JDL"; then
+          # JDL belongs to a Monte Carlo
+          OUTPUT_URL="${OUTPUT_URL}/MC"
+          [[ $LIMIT_FILES -ge 1 && $LIMIT_EVENTS -ge 1 ]] || { echo "LIMIT_FILES and LIMIT_EVENTS are wrongly set"; exit 1; }
+          echo "Split_override = \\"production:1-${LIMIT_FILES}\\";" >> $JDL
+          echo "SplitArguments_replace = { \\"--nevents\\\\\\s[0-9]+\\", \\"--nevents ${LIMIT_EVENTS} --ocdb \\$OCDB_PATH\\" };" >> $JDL
+          echo "OutputDir_override = \\"${OUTPUT_XRD}/${RELVAL_NAME}/MC/#alien_counter_04i#\\";" >> $JDL
+          echo "EnvironmentCommand = \\"export PACKAGES=\\\\\\"$ALIENV_PKGS\\\\\\"; export CVMFS_NAMESPACE=alice-nightlies; source custom_environment.sh; type aliroot\\";"
         else
-          echo "We will be using AliPhysics $ALIPHYSICS_VERSION with the following environment"
-          env
-          release-validation/relval-jenkins.sh
+          # Other JDL: not supported at the moment
+          echo "This JDL does not belong to a Monte Carlo. Not supported."
+          exit 1
         fi
+
+        # Start the Release Validation (notify on JIRA before and after)
+        jira_relval_started  "$JIRA_ISSUE" "$OUTPUT_URL" "${TAGS// /, }" false || true
+        jdl2makeflow --force --run $JDL -T wq -N alirelval_${RELVAL_NAME} -r 3 -C wqcatalog.marathon.mesos:9097 || RV=$?
+        jira_relval_finished "$JIRA_ISSUE" $RV "$OUTPUT_URL" "${TAGS// /, }" false || true
+        exit $RV
       '''
     }
   }
