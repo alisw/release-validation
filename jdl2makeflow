@@ -87,11 +87,13 @@ eval $(/cvmfs/alice.cern.ch/bin/alienv printenv {{packages|join(",")}})
 {{""}}
 # Job environment
 {% for x in environment -%}
+{% if "%" in environment[x] -%}
+export {{x}}=$(printf "{{environment[x]|replace('"', '\\\\"')}}" "$JOBID")
+{% else -%}
 export {{x}}="{{environment[x]|replace('"', '\\\\"')}}"
+{% endif -%}
 {% endfor -%}
 {{""}}
-# Output directory
-ALIEN_JDL_OUTPUTDIR=$(printf "$ALIEN_JDL_OUTPUTDIR" "$JOBID")
 echo "Output will be in $ALIEN_JDL_OUTPUTDIR"
 
 # Execute command and ignore errors
