@@ -269,7 +269,7 @@ node("$RUN_ARCH-relval") {
           echo "Split_override = \\"production:1-${LIMIT_FILES}\\";" >> $JDL
           echo "SplitArguments_replace = { \\"--nevents\\\\\\s[0-9]+\\", \\"--nevents ${LIMIT_EVENTS}\\" };" >> $JDL
           echo "OutputDir_override = \\"${OUTPUT_XRD}/${RELVAL_NAME}/MC/#alien_counter_04i#\\";" >> $JDL
-          echo "EnvironmentCommand = \\"export PACKAGES=\\\\\\"$ALIENV_PKGS\\\\\\"; export CVMFS_NAMESPACE=\\\\\\"$CVMFS_NAMESPACE\\\\\\"; source custom_environment.sh; type aliroot\\";"
+          echo "EnvironmentCommand = \\"export PACKAGES=\\\\\\"$ALIENV_PKGS\\\\\\"; export CVMFS_NAMESPACE=\\\\\\"$CVMFS_NAMESPACE\\\\\\"; source custom_environment.sh; type aliroot\\";" >> $JDL
         else
           # Other JDL: not supported at the moment
           echo "This JDL does not belong to a Monte Carlo. Not supported."
