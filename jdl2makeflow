@@ -4,7 +4,7 @@ import jinja2
 import json
 import jdl2makeflow_helpers
 from jdl2makeflow_helpers import classad
-import re, os, errno
+import re, os, errno, sys
 from shutil import copy2, rmtree
 from argparse import ArgumentParser, REMAINDER
 import subprocess
@@ -352,6 +352,7 @@ Environment variables available to the jobs:
         "env"      : " * "+"\n * ".join([ "%s ==> %s"%(x,jdl["Environment"][x]) for x in jdl["Environment"]])
 
 })
+sys.stdout.flush()
 if args.summary:
   exit(0)
 

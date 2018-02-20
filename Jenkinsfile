@@ -265,6 +265,7 @@ node("$RUN_ARCH-relval") {
           # JDL belongs to a Monte Carlo
           OUTPUT_URL="${OUTPUT_URL}/MC"
           [[ $LIMIT_FILES -ge 1 && $LIMIT_EVENTS -ge 1 ]] || { echo "LIMIT_FILES and LIMIT_EVENTS are wrongly set"; exit 1; }
+          echo "NoLiveOutput = 1;" >> $JDL
           echo "Split_override = \\"production:1-${LIMIT_FILES}\\";" >> $JDL
           echo "SplitArguments_replace = { \\"--nevents\\\\\\s[0-9]+\\", \\"--nevents ${LIMIT_EVENTS}\\" };" >> $JDL
           echo "OutputDir_override = \\"${OUTPUT_XRD}/${RELVAL_NAME}/MC/#alien_counter_04i#\\";" >> $JDL
