@@ -111,6 +111,9 @@ in a different way.
   want to change it for local use as the range is very large on the Grid. The
   job index is made available to some other variables through the
   `#alien_counter#` variable, see below.
+* `InputDataCollection`: file (from the current directory) containing the list
+  of input files to process, expecially for raw data reconstruction. The first
+  tier of jobs will be run with one job per input file.
 
 Since the same JDL will be used for running many jobs, it is in some cases
 useful to distinguish between output directories, and to tell the job what is

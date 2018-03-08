@@ -194,9 +194,20 @@ def get_preprocessed_jdl(jdl_fn, override={}, append={}, delete=[]):
   # Packages (filter out jemalloc)
   jdl["Packages"] = [ x for x in jdl["Packages"] if not "jemalloc" in x ]
 
+  # Read input files list (optional)
+  try:
+    jdl["InputFilesFromList"] = [ x.strip() for x in
+                                  open(os.path.basename(jdl.get("InputDataCollection", ""))).readlines()
+                                  if not re.search("(^\s*#|^\s*$)", x) ]
+  except Exception as e:
+    jdl["InputFilesFromList"] = []
+
   # Job range ("Split" parameter)
-  m = re.search("[^:]:([0-9]+)-([0-9]+)", jdl["Split"])
-  jdl["JobRange"] = [ int(m.group(1)), int(m.group(2)) ]
+  m = re.search("^([^:]+)(:([0-9]+)-([0-9]+))?$", jdl["Split"])
+  if m.group(3) and m.group(4):
+    jdl["JobRange"] = [ int(m.group(3)), int(m.group(4)) ]  # production
+  else:
+    jdl["JobRange"] = [ 0, max(0, len(jdl["InputFilesFromList"])-1) ]  # file
 
   # Remove @disk spec from output list
   jdl["Output"] = [ o.split("@", 1)[0] for o in jdl["Output"] ]
@@ -248,7 +259,7 @@ def get_preprocessed_jdl(jdl_fn, override={}, append={}, delete=[]):
   all_vars = jdl.keys()
   whitelist = [ "SplitArguments", "Executable", "Packages", "JobRange", "JobRange", "Output",
                 "InputFile", "Environment", "NextStages", "OutputDir", "EnvironmentCommand",
-                "SaveAll", "DontArchive", "NoLiveOutput" ] + \
+                "SaveAll", "DontArchive", "NoLiveOutput", "InputFilesFromList" ] + \
               override.keys() + append.keys()
   for k in all_vars:
     if k in delete or k not in whitelist:
@@ -333,7 +344,10 @@ Packages:
 %(numjobs)d total jobs, with job IDs from %(joba)d to %(jobb)d (included), will execute the command:
 %(command)s
 
-Input files (must be in the current directory, will be made available to each job):
+Required files (must be in the current directory, will be made available to each job):
+%(reqd)s
+
+Input files:
 %(input)s
 
 Output files (archives with content listed):
@@ -347,7 +361,8 @@ Environment variables available to the jobs:
         "joba"     : jdl["JobRange"][0],
         "jobb"     : jdl["JobRange"][1],
         "command"  : jdl["Executable"] + " " + jdl["SplitArguments"],
-        "input"    : " * "+"\n * ".join(jdl["InputFile"]),
+        "reqd"     : " * "+"\n * ".join(jdl["InputFile"]),
+        "input"    : " * "+"\n * ".join(jdl["InputFilesFromList"]),
         "output"   : " * "+"\n * ".join([ " ==> ".join(x.split(":", 1)) for x in jdl["Output"] ]),
         "env"      : " * "+"\n * ".join([ "%s ==> %s"%(x,jdl["Environment"][x]) for x in jdl["Environment"]])
 
