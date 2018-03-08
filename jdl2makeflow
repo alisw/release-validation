@@ -215,9 +215,9 @@ def get_preprocessed_jdl(jdl_fn, override={}, append={}, delete=[]):
 
   # Job environment
   environment = {}
-  for v in jdl["JDLVariables"]:
+  for v in jdl.get("JDLVariables", []):
     environment["ALIEN_JDL_"+v.upper()] = preprocess_var(jdl.get(v, ""))  # with ALIEN_JDL_
-  for v in jdl["ExtraVariables"]:
+  for v in jdl.get("ExtraVariables", []):
     environment[v] = preprocess_var(jdl.get(v, ""))  # exported as-is
   jdl["Environment"] = environment
 
