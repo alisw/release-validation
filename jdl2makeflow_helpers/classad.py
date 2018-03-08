@@ -29,18 +29,18 @@ def parse(content, ignore_errors=False, process=True):
       buf += x
   if process:
     data_del = []
-    for k in data:
+    for k in data.keys():
       m = re.search("^(.*)_(append|override|replace)$", k)
-      if not m or not m.group(1) in data:
+      if not m:
         continue
       if m.group(2) == "append":
-        data[m.group(1)] += data[k]
+        data[m.group(1)] = data[m.group(1)] + data[k] if m.group(1) in data else data[k]
         data_del.append(k)
       elif m.group(2) == "override":
         data[m.group(1)] = data[k]
         data_del.append(k)
       elif m.group(2) == "replace" and isinstance(data[k], list) and len(data[k]) == 2:
-        data[m.group(1)] = re.sub(data[k][0], data[k][1], data[m.group(1)])
+        data[m.group(1)] = re.sub(data[k][0], data[k][1], data.get(m.group(1), ""))
         data_del.append(k)
     for k in data_del:
       del data[k]
