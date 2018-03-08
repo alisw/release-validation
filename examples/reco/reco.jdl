@@ -1,0 +1,67 @@
+COMMENT = "Downloaded from https://alimonitor.cern.ch/users/download.jsp?view=true&path=/alice/cern.ch/user/a/alidaq/LHC17r/rec_pass2.jdl";
+
+Executable = "/alice/cern.ch/user/a/alidaq/bin/aliroot_dpgPPass.sh";
+
+Packages =
+{
+  "VO_ALICE@AliDPG::v5-09-XX-28",
+  "VO_ALICE@AliPhysics::v5-09-18-01-1",
+  "VO_ALICE@jemalloc::v3.6.0"
+};
+
+Jobtag = {
+  "comment:LHC period LHC17r - Full production pass 1, ALIROOT-7604"
+};
+
+LegoResubmitZombies = "1";
+
+Requirements = member(other.GridPartitions,"ultrapower");
+
+TTL = "70000";
+Price = "10";
+
+ProxyTTL = "1";
+
+DirectAccess="true";
+
+Validationcommand = "/alice/validation/validation.sh";
+
+JDLVariables = {"Packages", "OutputDir", "LPMPassName", "RAWPRODTYPE"};
+
+Workdirectorysize = {"6000MB"};
+
+InputDataCollection = "LF:/alice/data/2017/LHC17r/$1/collection";
+Split = "file";
+SplitArguments = {"/alice/data/2017/LHC17r/$1/raw/#alienfilename#"};
+
+OutputDir = "/alice/data/2017/LHC17r/$1/pass1/#alienfilename/.root//#";
+
+Output = {
+  "log_archive:*.log@disk=1",
+  "root_archive.zip:AliESDs.root,AliESDfriends.root,Merged.QA.Data*.root,*.ESD.tag.root@disk=2",
+  "QA_archive.zip:QAresults*.root,*.stat.qa*,event_stat*.root,trending*.root@disk=2",
+  "aod_archive.zip:pyxsec*.root,AODQA.root,AliAOD*.root,FilterEvents_Trees*.root,*.stat.aod@disk=2",
+  "EventStat_temp*.root@disk=2"
+};
+
+# Explicit setting of pass number for dE/dX splines (TPC), see ticket https://alice.its.cern.ch/jira/browse/ALIROOT-5540
+LPMRawPass="1";
+RAWPRODTYPE="pass1";
+
+#Store ERROR_E jobs output
+OutputErrorE={"log_archive.zip:*.log@disk=1"};
+
+COMMENT = "The rest of the file (apart from the SplitArguments number of evts) was not changed";
+InputFile_append = { "eos-proxy", "custom_environment.sh" };
+Comment_Split_override = "production:1-1";
+Comment_SplitArguments_append = " --ocdb $OCDB_PATH --seed $MC_SEED";
+Comment_SplitArguments_replace = { "--nevents\\s[0-9]+", "--nevents 1" };
+Comment_X509_USER_PROXY = "$PWD/eos-proxy";
+Comment_CONFIG_OCDB = "cvmfs";
+Comment_OCDB_PATH = "/cvmfs/alice-ocdb.cern.ch";
+Comment_MC_SEED = "1%04i";
+Comment_ExtraVariables = { "X509_USER_PROXY", "CONFIG_OCDB", "OCDB_PATH", "MC_SEED" };
+Comment_OutputDir_override = "root://eospublic.cern.ch//eos/experiment/alice/release-validation/output/gpmc001/#alien_counter_04i#";
+EnvironmentCommand = "source local_environment.sh";
+InputDataCollection_override = "input_files.txt";
+Comment_NoLiveOutput = 1;
