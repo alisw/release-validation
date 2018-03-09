@@ -120,12 +120,12 @@ type "$PROG" &> /dev/null || PROG="{{executable|basename()}}"
 type "$PROG" &> /dev/null || PROG="$ALIDPG_ROOT/bin/{{executable|basename()}}"
 type "$PROG" &> /dev/null || PROG="./{{executable|basename()}}"
 MAINERR=0
-{ env; echo + $PROG $* $ARGS; } >> stdout.log
-$PROG "$@" $ARGS  > >(tee -a stdout.log{% if no_live_out %} &> /dev/null{% endif %}) \\
-                 2> >(tee -a stderr.log{% if no_live_out %} &> /dev/null{% endif %}) || MAINERR=$?
+{ env; echo + $PROG $ARGS; } >> stdout.log
+$PROG $ARGS  > >(tee -a stdout.log{% if no_live_out %} &> /dev/null{% endif %}) \\
+            2> >(tee -a stderr.log{% if no_live_out %} &> /dev/null{% endif %}) || MAINERR=$?
 {% endif -%}
 [[ $MAINERR != 0 ]] && echo "Exited with errors ($MAINERR)" || echo "Exited with no errors";
-{ echo + $PROG $* $ARGS "exited with $MAINERR"; } >> stdout.log
+{ echo + $PROG $ARGS "exited with $MAINERR"; } >> stdout.log
 
 # Compress output according to the output list
 mkdir to_transfer
