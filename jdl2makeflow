@@ -39,15 +39,17 @@ j2env.filters["basename"] = lambda x: os.path.basename(x)
 def preprocess_var(s, sh_mode):
   if isinstance(s, list):
     s = ",".join(s)
-  if not re.search("#alien_counter(_[^#]+)?#", s):
+  if not re.search("#alien_counter(_[^#]+)?#|#alienfilename(/([^/#]+)/([^/#]*)/)?#", s):
     return s
   if sh_mode:
     # Shell mode: rely on script's alienfmt() shell function
     s = "$(alienfmt '%s')" % s
   else:
-    # Python mode: use Python's builtin string formatting
+    # Jinja mode: use Jinja's builtin string formatting
     s = s.replace("#alien_counter#", "#alien_counter_i#")
-    s = re.sub("#alien_counter_([^#]+)#", "%(alien_counter)\\1", s)
+    s = re.sub("#alien_counter_([^#]+)#", "{{'%\\1'|format(alien_counter)}}", s)
+    s = s.replace("#alienfilename#", "{{input_files[alien_counter]}}")
+    s = re.sub("#alienfilename/([^/#]+)/([^/#]*)/#", "{{input_files[alien_counter]|replace('\\1','\\2')}}", s)
   return s
 
 def gen_runjob(output_file, jdl, dry_run):
@@ -61,12 +63,26 @@ JOBID=$1
 JOBDIR=$(basename "$0")
 JOBDIR=job-${JOBDIR%.*}-$(printf %04d $JOBID)
 DONEFILE="$PWD/$2"
-shift 2
+INPUTFILE="$3"
 
 function alienfmt() {
   local ALIENFMT_STR="$1"
-  ALIENFMT_STR=${ALIENFMT_STR//"#alien_counter#"/"#alien_counter_i#"}
-  ALIENFMT_STR=$(printf -- "$ALIENFMT_STR" | sed -e 's/#alien_counter_\([^#]\+\)#/$(printf "%\\1" $JOBID)/g')
+
+  RE='^(.*)#alien_counter(_([^#]+))?#(.*)$'
+  while [[ $ALIENFMT_STR =~ $RE ]]; do
+    REPLACE=${BASH_REMATCH[3]}
+    [[ $REPLACE ]] || REPLACE=i
+    REPLACE=$(printf %${REPLACE} $JOBID)
+    ALIENFMT_STR="${BASH_REMATCH[1]}${REPLACE}${BASH_REMATCH[4]}"
+  done
+
+  RE='^(.*)#alienfilename(/([^#/]+/[^#/]*)/)?#(.*)$'
+  while [[ $ALIENFMT_STR =~ $RE ]]; do
+    REPLACE=${BASH_REMATCH[3]}
+    [[ $REPLACE ]] && REPLACE='${INPUTFILE//'$REPLACE'}' || REPLACE='$INPUTFILE'
+    ALIENFMT_STR="${BASH_REMATCH[1]}${REPLACE}${BASH_REMATCH[4]}"
+  done
+
   ALIENFMT_STR=$(eval printf -- \\""$ALIENFMT_STR"\\")
   echo "$ALIENFMT_STR"
 }
@@ -181,19 +197,18 @@ touch $DONEFILE
                            args        = jdl["SplitArguments"]))
   os.chmod(output_file, int("755", 8))
 
-def get_alien_xml(pattern, joba, jobb):
-  pattern = preprocess_var(pattern, sh_mode=False)
+def get_alien_xml(pattern, joba, jobb, input_files):
   axml = j2env.from_string("""
 <alien>
   <collection name="alien_collection.xml">
-    {%- for evt in range(joba,jobb+1) %}
-    <event name="{{evt}}">
-      <file turl="{{pattern|format(alien_counter=evt)}}" type="f"/>
+    {%- for alien_counter in range(joba,jobb+1) %}
+    <event name="{{alien_counter}}">
+      <file turl="***TURL***" type="f"/>
     </event>{% endfor %}
   </collection>
 </alien>
-""")
-  return axml.render(joba=joba, jobb=jobb, pattern=pattern)
+""".replace("***TURL***", preprocess_var(pattern, sh_mode=False)))
+  return axml.render(joba=joba, jobb=jobb, input_files=input_files)
 
 def get_preprocessed_jdl(jdl_fn, override={}, append={}, delete=[]):
   jdl = classad.parse(open(jdl_fn).read(), ignore_errors=True)
@@ -299,7 +314,7 @@ if "MergeFilteredTrees" in jdl.get("NextStages", []):
               append={ "InputFile": [ "spc_merge.sh", "spc_merge.C", "spc.xml" ] },
               delete=[ "NextStages", "JobRange" ])
   xml_mft = get_alien_xml(os.path.join(jdl["OutputDir"], "FilterEvents_Trees.root"),
-                          jdl["JobRange"][0], jdl["JobRange"][1])
+                          jdl["JobRange"][0], jdl["JobRange"][1], jdl["InputFilesFromList"])
   all_inputs["MergeFilteredTrees"] = jdl_mft["InputFile"]
 
 # Second tier of jobs: FinalQA
@@ -316,10 +331,10 @@ if "FinalQA" in jdl.get("NextStages", []):
               delete=[ "NextStages", "JobRange" ])
   if inputfile_fqa.endswith(".xml"):
     inputlist_fqa = get_alien_xml(os.path.join(jdl["OutputDir"], "QA_archive.zip"),
-                            jdl["JobRange"][0], jdl["JobRange"][1])
+                            jdl["JobRange"][0], jdl["JobRange"][1], jdl["InputFilesFromList"])
   else:
     pattern = preprocess_var(jdl["OutputDir"], sh_mode=False)
-    inputlist_fqa = "\n".join([ pattern % { "alien_counter": ji }
+    inputlist_fqa = "\n".join([ j2env.from_string(pattern).render(alien_counter=ji)
                                 for ji in range(jdl["JobRange"][0], jdl["JobRange"][1]+1) ]) + "\n"
   all_inputs["FinalQA"] = jdl_fqa["InputFile"]
   qap_inputs = [ "QAresults.root", "QAresults_merged.root", "QAresults_barrel.root",
@@ -367,6 +382,9 @@ Input files:
 Output files (archives with content listed):
 %(output)s
 
+Output directory:
+%(outdir)s
+
 Environment variables available to the jobs:
 %(env)s
 """ % { "packages" : " * "+"\n * ".join(jdl["Packages"]) if not "EnvironmentCommand" in jdl else \
@@ -378,6 +396,7 @@ Environment variables available to the jobs:
         "reqd"     : " * "+"\n * ".join(jdl["InputFile"]),
         "input"    : " * "+"\n * ".join(jdl["InputFilesFromList"]),
         "output"   : " * "+"\n * ".join([ " ==> ".join(x.split(":", 1)) for x in jdl["Output"] ]),
+        "outdir"   : jdl["OutputDir"],
         "env"      : " * "+"\n * ".join([ "%s ==> %s"%(x,jdl["Environment"][x]) for x in jdl["Environment"]])
 
 })
@@ -431,7 +450,7 @@ makeflow = j2env.from_string("""# Automatically generated
 
 {% for jobindex in range(joba,jobb) -%}
 job{{ "%04d"|format(jobindex) }}.done: runjob.sh {{input_list["Jobs"]|join(" ")}}
-	./runjob.sh {{jobindex}} job{{"%04d"|format(jobindex)}}.done
+	./runjob.sh {{jobindex}} job{{"%04d"|format(jobindex)}}.done{% if input_files|length > 1 %} {{input_files[jobindex-joba]}}{% endif %}
 {% endfor -%}
 
 {% if "MergeFilteredTrees" in next_stages -%}
@@ -452,6 +471,7 @@ with open(makeflow_fn, "w") as mf:
                            input_list  = all_inputs,
                            joba        = jdl["JobRange"][0],
                            jobb        = jdl["JobRange"][1]+1,
+                           input_files = jdl["InputFilesFromList"],
                            next_stages = jdl.get("NextStages", [])))
 
 if not args.run:
