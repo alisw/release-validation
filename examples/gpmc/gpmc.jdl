@@ -70,7 +70,7 @@ Activity = "SIM";
 
 COMMENT = "The rest of the file (apart from the SplitArguments number of evts) was not changed";
 InputFile_append = { "eos-proxy", "custom_environment.sh" };
-Split_override = "production:1-1";
+Split_override = "production:1-5";
 SplitArguments_append = " --ocdb $OCDB_PATH --seed $MC_SEED";
 SplitArguments_replace = { "--nevents\\s[0-9]+", "--nevents 1" };
 X509_USER_PROXY = "$PWD/eos-proxy";
@@ -81,3 +81,4 @@ ExtraVariables = { "X509_USER_PROXY", "CONFIG_OCDB", "OCDB_PATH", "MC_SEED" };
 OutputDir_override = "root://eospublic.cern.ch//eos/experiment/alice/release-validation/output/gpmc001/#alien_counter_04i#";
 EnvironmentCommand = "export PACKAGES=\"VO_ALICE@AliPhysics::v5-09-22-01-rc1-2 VO_ALICE@AliDPG::v5-09-XX-46-rc1-1\"; export CVMFS_NAMESPACE=alice-nightlies; source custom_environment.sh; type aliroot";
 NoLiveOutput = 1;
+DontArchive = 1;
