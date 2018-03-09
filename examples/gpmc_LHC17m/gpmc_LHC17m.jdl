@@ -76,7 +76,7 @@ SplitArguments_replace = { "--nevents\\s[0-9]+", "--nevents 1" };
 X509_USER_PROXY = "$PWD/eos-proxy";
 CONFIG_OCDB = "cvmfs";
 OCDB_PATH = "/cvmfs/alice-ocdb.cern.ch";
-MC_SEED = "1%04i";
+MC_SEED = "1#alien_counter_04i#";
 ExtraVariables = { "X509_USER_PROXY", "CONFIG_OCDB", "OCDB_PATH", "MC_SEED" };
 OutputDir_override = "root://eospublic.cern.ch//eos/experiment/alice/release-validation/output/gpmc001/#alien_counter_04i#";
 EnvironmentCommand = "export PACKAGES=\"VO_ALICE@AliPhysics::v5-09-22-01-rc1-2 VO_ALICE@AliDPG::v5-09-XX-46-rc1-1\"; export CVMFS_NAMESPACE=alice-nightlies; source custom_environment.sh; type aliroot";

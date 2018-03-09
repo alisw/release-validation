@@ -36,11 +36,19 @@ args = ap.parse_args()
 j2env = jinja2.Environment()
 j2env.filters["basename"] = lambda x: os.path.basename(x)
 
-def preprocess_var(s):
+def preprocess_var(s, sh_mode):
   if isinstance(s, list):
     s = ",".join(s)
-  s = s.replace("#alien_counter#", "#alien_counter_i#")
-  return re.sub("#alien_counter_([^#]+)#", "%\\1", s)
+  if not re.search("#alien_counter(_[^#]+)?#", s):
+    return s
+  if sh_mode:
+    # Shell mode: rely on script's alienfmt() shell function
+    s = "$(alienfmt '%s')" % s
+  else:
+    # Python mode: use Python's builtin string formatting
+    s = s.replace("#alien_counter#", "#alien_counter_i#")
+    s = re.sub("#alien_counter_([^#]+)#", "%(alien_counter)\\1", s)
+  return s
 
 def gen_runjob(output_file, jdl, dry_run):
   runjob = j2env.from_string("""#!/bin/bash -e
@@ -54,6 +62,15 @@ JOBDIR=$(basename "$0")
 JOBDIR=job-${JOBDIR%.*}-$(printf %04d $JOBID)
 DONEFILE="$PWD/$2"
 shift 2
+
+function alienfmt() {
+  local ALIENFMT_STR="$1"
+  ALIENFMT_STR=${ALIENFMT_STR//"#alien_counter#"/"#alien_counter_i#"}
+  ALIENFMT_STR=$(printf -- "$ALIENFMT_STR" | sed -e 's/#alien_counter_\([^#]\+\)#/$(printf "%\\1" $JOBID)/g')
+  ALIENFMT_STR=$(eval printf -- \\""$ALIENFMT_STR"\\")
+  echo "$ALIENFMT_STR"
+}
+
 rm -rf job-$JOBDIR
 mkdir job-$JOBDIR
 cd job-$JOBDIR
@@ -87,21 +104,18 @@ eval $(/cvmfs/alice.cern.ch/bin/alienv printenv {{packages|join(",")}})
 {{""}}
 # Job environment
 {% for x in environment -%}
-{% if "%" in environment[x] -%}
-export {{x}}=$(printf "{{environment[x]|replace('"', '\\\\"')}}" "$JOBID")
-{% else -%}
 export {{x}}="{{environment[x]|replace('"', '\\\\"')}}"
-{% endif -%}
 {% endfor -%}
 {{""}}
 echo "Output will be in $ALIEN_JDL_OUTPUTDIR"
 
 # Execute command and ignore errors
+ARGS="{{args}}"
+PROG="{{executable}}"
 {% if dry_run -%}
 echo "Doing nothing: dry run" >> stdout.log
+MAINERR=0
 {% else -%}
-ARGS=$(printf -- "{{args}}" "$JOBID")
-PROG="{{executable}}"
 type "$PROG" &> /dev/null || PROG="{{executable|basename()}}"
 type "$PROG" &> /dev/null || PROG="$ALIDPG_ROOT/bin/{{executable|basename()}}"
 type "$PROG" &> /dev/null || PROG="./{{executable|basename()}}"
@@ -111,7 +125,7 @@ $PROG "$@" $ARGS  > >(tee -a stdout.log{% if no_live_out %} &> /dev/null{% endif
                  2> >(tee -a stderr.log{% if no_live_out %} &> /dev/null{% endif %}) || MAINERR=$?
 {% endif -%}
 [[ $MAINERR != 0 ]] && echo "Exited with errors ($MAINERR)" || echo "Exited with no errors";
-{ echo + $PROG $* $ARGS " exited with $MAINERR"; } >> stdout.log
+{ echo + $PROG $* $ARGS "exited with $MAINERR"; } >> stdout.log
 
 # Compress output according to the output list
 mkdir to_transfer
@@ -168,13 +182,13 @@ touch $DONEFILE
   os.chmod(output_file, int("755", 8))
 
 def get_alien_xml(pattern, joba, jobb):
-  pattern = preprocess_var(pattern)
+  pattern = preprocess_var(pattern, sh_mode=False)
   axml = j2env.from_string("""
 <alien>
   <collection name="alien_collection.xml">
     {%- for evt in range(joba,jobb+1) %}
     <event name="{{evt}}">
-      <file turl="{{pattern|format(evt)}}" type="f"/>
+      <file turl="{{pattern|format(alien_counter=evt)}}" type="f"/>
     </event>{% endfor %}
   </collection>
 </alien>
@@ -188,8 +202,8 @@ def get_preprocessed_jdl(jdl_fn, override={}, append={}, delete=[]):
   for k in override:
     jdl[k] = override[k]
 
-  # Command-line arguments, with alien_counter (will be substituted with the job number)
-  jdl["SplitArguments"] = preprocess_var(jdl["SplitArguments"])
+  # Command-line arguments, supporting AliEn variables
+  jdl["SplitArguments"] = preprocess_var(jdl["SplitArguments"], sh_mode=True)
 
   # Packages (filter out jemalloc)
   jdl["Packages"] = [ x for x in jdl["Packages"] if not "jemalloc" in x ]
@@ -227,9 +241,9 @@ def get_preprocessed_jdl(jdl_fn, override={}, append={}, delete=[]):
   # Job environment
   environment = {}
   for v in jdl.get("JDLVariables", []):
-    environment["ALIEN_JDL_"+v.upper()] = preprocess_var(jdl.get(v, ""))  # with ALIEN_JDL_
+    environment["ALIEN_JDL_"+v.upper()] = preprocess_var(jdl.get(v, ""), sh_mode=True)  # with ALIEN_JDL_
   for v in jdl.get("ExtraVariables", []):
-    environment[v] = preprocess_var(jdl.get(v, ""))  # exported as-is
+    environment[v] = preprocess_var(jdl.get(v, ""), sh_mode=True)  # exported as-is
   jdl["Environment"] = environment
 
   # Output requested not in zip files
@@ -304,8 +318,8 @@ if "FinalQA" in jdl.get("NextStages", []):
     inputlist_fqa = get_alien_xml(os.path.join(jdl["OutputDir"], "QA_archive.zip"),
                             jdl["JobRange"][0], jdl["JobRange"][1])
   else:
-    pattern = preprocess_var(jdl["OutputDir"])
-    inputlist_fqa = "\n".join([ pattern % ji
+    pattern = preprocess_var(jdl["OutputDir"], sh_mode=False)
+    inputlist_fqa = "\n".join([ pattern % { "alien_counter": ji }
                                 for ji in range(jdl["JobRange"][0], jdl["JobRange"][1]+1) ]) + "\n"
   all_inputs["FinalQA"] = jdl_fqa["InputFile"]
   qap_inputs = [ "QAresults.root", "QAresults_merged.root", "QAresults_barrel.root",
