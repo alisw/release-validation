@@ -1,0 +1,27 @@
+dist: trusty
+language: python
+python:
+  - "2.7"
+  - "3.5"
+install:
+  - pip install jinja2
+  - pip install codecov
+script: |
+  set -e
+  COV_REPORTS=
+  pushd examples/
+    for DIR in *; do
+      [[ -d $DIR ]] || continue
+      pushd $DIR/
+        echo ">> Testing JDL under $DIR"
+        echo "dummy eos-proxy" > eos-proxy
+        coverage run ../../jdl2makeflow *.jdl
+        coverage xml
+        COV_REPORTS="$COV_REPORTS $PWD/coverage.xml"
+      popd
+    done
+  popd
+  echo ">> Listing current directory - $PWD"
+  find . -type f -ls
+  echo ">> Uploading codecov reports"
+  codecov --file $COV_REPORTS --root $PWD
