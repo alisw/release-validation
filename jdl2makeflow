@@ -289,8 +289,8 @@ def get_preprocessed_jdl(jdl_fn, override={}, append={}, delete=[]):
   whitelist = [ "SplitArguments", "Executable", "Packages", "JobRange", "JobRange", "Output",
                 "InputFile", "Environment", "NextStages", "OutputDir", "EnvironmentCommand",
                 "SaveAll", "DontArchive", "NoLiveOutput", "InputFilesFromList" ] + \
-              override.keys() + append.keys()
-  for k in all_vars:
+              list(override.keys()) + list(append.keys())
+  for k in list(all_vars):
     if k in delete or k not in whitelist:
       del jdl[k]
 

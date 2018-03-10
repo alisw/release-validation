@@ -29,7 +29,7 @@ def parse(content, ignore_errors=False, process=True):
       buf += x
   if process:
     data_del = []
-    for k in data.keys():
+    for k in list(data.keys()):
       m = re.search("^(.*)_(append|override|replace)$", k)
       if not m:
         continue
