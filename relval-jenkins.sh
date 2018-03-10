@@ -261,7 +261,7 @@ else
   echo "Starting the Release Validation."
   set +e
   [[ $DRY_RUN == true ]] && ./benchmark.sh goGenerateMakeflow "$RELVAL_NAME" files.list benchmark.config $EXTRA_VARIABLES || true
-  $DRY_RUN_PREFIX ./benchmark.sh run "$RELVAL_NAME" files.list benchmark.config $EXTRA_VARIABLES
+  $DRY_RUN_PREFIX ./benchmark.sh run "$RELVAL_NAME" files.list benchmark.config $EXTRA_VARIABLES &> /dev/null
   RV=$?
 fi
 
