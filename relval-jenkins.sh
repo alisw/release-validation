@@ -156,7 +156,7 @@ if [[ "$(relvalvar baseOutputDirectory)" == */eos/* ]]; then
   EOS_HOST=$(relvalvar baseOutputDirectory | sed -e 's!'"$EOS_RE"'!\1!')
   EOS_PATH=$(relvalvar baseOutputDirectory | sed -e 's!'"$EOS_RE"'!\2!')
   EOS_QUOTA_RAW=$(relvalenv eos $EOS_HOST quota $EOS_PATH -m)
-  EOS_QUOTA=$(echo $EOS_QUOTA_RAW | grep uid= || true)  # validate output
+  EOS_QUOTA=$(echo $EOS_QUOTA_RAW | grep -E 'uid=|gid=' || true)  # validate output
   if [[ $EOS_QUOTA ]]; then
   (
     eval $EOS_QUOTA
