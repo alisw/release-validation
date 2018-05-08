@@ -2,6 +2,7 @@ jdl2makeflow
 ============
 
 [![PyPI version](https://badge.fury.io/py/alien-jdl2makeflow.svg)](https://badge.fury.io/py/alien-jdl2makeflow)
+[![codecov](https://codecov.io/gh/alisw/release-validation/branch/master/graph/badge.svg)](https://codecov.io/gh/alisw/release-validation)
 
 Run [AliEn](http://alien.web.cern.ch) JDLs on multiple platforms using
 [Makeflow](http://ccl.cse.nd.edu/software/makeflow).
