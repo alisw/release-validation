@@ -473,6 +473,13 @@ with open(makeflow_fn, "w") as mf:
                            jobb        = jdl["JobRange"][1]+1,
                            input_files = jdl["InputFilesFromList"],
                            next_stages = jdl.get("NextStages", [])))
+wd = os.getcwd()
+os.chdir(args.work_dir)
+try:
+  subprocess.check_call("makeflow_viz | dot -T pdf -o Makeflow.pdf", shell=True)
+except:
+  print("WARNING: cannot generate workflow graph")
+os.chdir(wd)
 
 if not args.run:
   print("""Execute the workflow with:
