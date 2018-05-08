@@ -133,8 +133,9 @@ echo "Doing nothing: dry run" >> stdout.log
 MAINERR=0
 {% else -%}
 type "$PROG" &> /dev/null || PROG="{{executable|basename()}}"
-type "$PROG" &> /dev/null || PROG="$ALIDPG_ROOT/bin/{{executable|basename()}}"
-type "$PROG" &> /dev/null || PROG="./{{executable|basename()}}"
+type "$PROG" &> /dev/null || PROG="$(find "$ALIDPG_ROOT" -name "{{executable|basename()}}" -print -quit || true)"
+[[ "$PROG" ]] || PROG="./{{executable|basename()}}"
+[[ -x "$PROG" ]] || PROG="bash $PROG"
 MAINERR=0
 { env; echo + $PROG $ARGS; } >> stdout.log
 $PROG $ARGS  > >(tee -a stdout.log{% if no_live_out %} &> /dev/null{% endif %}) \\
