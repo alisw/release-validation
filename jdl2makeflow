@@ -48,8 +48,8 @@ def preprocess_var(s, sh_mode):
     # Jinja mode: use Jinja's builtin string formatting
     s = s.replace("#alien_counter#", "#alien_counter_i#")
     s = re.sub("#alien_counter_([^#]+)#", "{{'%\\1'|format(alien_counter)}}", s)
-    s = s.replace("#alienfilename#", "{{input_files[alien_counter]}}")
-    s = re.sub("#alienfilename/([^/#]+)/([^/#]*)/#", "{{input_files[alien_counter]|replace('\\1','\\2')}}", s)
+    s = s.replace("#alienfilename#", "{{input_files[alien_counter]|basename()}}")
+    s = re.sub("#alienfilename/([^/#]+)/([^/#]*)/#", "{{input_files[alien_counter]|basename()|replace('\\1','\\2')}}", s)
   return s
 
 def gen_runjob(output_file, jdl, dry_run):
@@ -67,6 +67,7 @@ INPUTFILE="$3"
 
 function alienfmt() {
   local ALIENFMT_STR="$1"
+  local INPUTFILE_BASE=${INPUTFILE##*/}
 
   RE='^(.*)#alien_counter(_([^#]+))?#(.*)$'
   while [[ $ALIENFMT_STR =~ $RE ]]; do
@@ -79,7 +80,7 @@ function alienfmt() {
   RE='^(.*)#alienfilename(/([^#/]+/[^#/]*)/)?#(.*)$'
   while [[ $ALIENFMT_STR =~ $RE ]]; do
     REPLACE=${BASH_REMATCH[3]}
-    [[ $REPLACE ]] && REPLACE='${INPUTFILE//'$REPLACE'}' || REPLACE='$INPUTFILE'
+    [[ $REPLACE ]] && REPLACE='${INPUTFILE_BASE//'$REPLACE'}' || REPLACE='$INPUTFILE_BASE'
     ALIENFMT_STR="${BASH_REMATCH[1]}${REPLACE}${BASH_REMATCH[4]}"
   done
 
