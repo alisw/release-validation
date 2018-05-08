@@ -260,7 +260,7 @@ def get_preprocessed_jdl(jdl_fn, override={}, append={}, delete=[]):
     if jdl.get("Executable", "").endswith("aliroot_dpgsim.sh"):
       jdl["NextStages"] = [ "FinalQA", "MergeFilteredTrees" ]
     elif jdl.get("Executable", "").endswith("aliroot_dpgCPass0.sh"):
-      jdl["NextStages"] = [ "RecoCPass0OCDB" ]
+      jdl["NextStages"] = []
 
   # Job environment
   environment = {}
@@ -309,18 +309,6 @@ def get_preprocessed_jdl(jdl_fn, override={}, append={}, delete=[]):
 all_inputs = {}
 jdl = get_preprocessed_jdl(args.jdl)
 all_inputs["Jobs"] = jdl["InputFile"]
-
-# Tier 050 - OCDB from RAW data (single job)
-jdl_reco_cpass0_ocdb = {}
-if "RecoCPass0OCDB" in jdl.get("NextStages", []):
-  jdl_reco_cpass0_ocdb = \
-    get_preprocessed_jdl(args.jdl,
-      override={ "Output": [ "OCDB.root", "ocdb_log_archive.zip:std*.ocdb.log,std*.log,rec.log@disk=2" ],
-                 "OutputDir": os.path.dirname(preprocess_var(jdl["OutputDir"], sh_mode=False)),
-                 "Arguments": jdl["InputFilesFromList"][0] + " OCDB" },
-      append={},
-      delete=[ "NextStages", "JobRange" ])
-  all_inputs["RecoCPass0OCDB"] = jdl_reco_cpass0_ocdb["InputFile"]
 
 # Second tier of jobs: merging of filtered trees
 jdl_mft = {}
@@ -373,9 +361,6 @@ if "FinalQA" in jdl.get("NextStages", []):
   all_inputs["QAPlots"] = jdl_qap["InputFile"]
 
 if args.parse_jdl:
-  if jdl_reco_cpass0_ocdb:
-    print("\n# Reconstruction: OCDB for CPass0")
-    print(json.dumps(jdl_reco_cpass0_ocdb, indent=2))
   print("# First tier of jobs")
   print(json.dumps(jdl, indent=2))
   if jdl_mft:
@@ -444,8 +429,6 @@ except OSError as e:
   exit(1)
 
 # Create XML files and scripts for tiers > first
-if jdl_reco_cpass0_ocdb:
-  gen_runjob(os.path.join(args.work_dir, "runrecocpass0ocdb.sh"), jdl_reco_cpass0_ocdb, args.dry_run)
 if jdl_mft:
   with open(os.path.join(args.work_dir, "spc.xml"), "w") as f: f.write(xml_mft)
   gen_runjob(os.path.join(args.work_dir, "runspc.sh"), jdl_mft, args.dry_run)
@@ -474,13 +457,8 @@ gen_runjob(os.path.join(args.work_dir, "runjob.sh"), jdl, args.dry_run)
 # Produce the Makeflow
 makeflow = j2env.from_string("""# Automatically generated
 
-{% if "RecoCPass0OCDB" in next_stages -%}
-recocpass0ocdb.done: runrecocpass0ocdb.sh {{input_list["RecoCPass0OCDB"]|join(" ")}}
-	./runrecocpass0ocdb.sh 0 recocpass0ocdb.done
-{% endif -%}
-
 {% for jobindex in range(joba,jobb) -%}
-job{{ "%04d"|format(jobindex) }}.done: runjob.sh {{input_list["Jobs"]|join(" ")}} {{ "recocpass0ocdb.done" if "RecoCPass0OCDB" in next_stages else "" }}
+job{{ "%04d"|format(jobindex) }}.done: runjob.sh {{input_list["Jobs"]|join(" ")}}
 	./runjob.sh {{jobindex}} job{{"%04d"|format(jobindex)}}.done{% if input_files|length > 1 %} {{input_files[jobindex-joba]}}{% endif %}
 {% endfor -%}
 
