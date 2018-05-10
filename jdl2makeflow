@@ -316,6 +316,7 @@ if not args.start_at:
   args.start_at = "cpass0" if "MergeMakeOCDB_CPass0" in jdl.get("NextStages", []) else "sim"
 
 # Reco CPass0: merge and make OCDB
+jdl_reco_mergemakeocdbcpass0 = {}
 if "MergeMakeOCDB_CPass0" in jdl.get("NextStages", []):
   runNumber = int(os.path.basename(jdl["InputFilesFromList"][0])[2:11])
   jdl_reco_mergemakeocdbcpass0 = \
@@ -335,6 +336,8 @@ if "MergeMakeOCDB_CPass0" in jdl.get("NextStages", []):
   xml_reco = get_alien_xml(os.path.join(jdl["OutputDir"], "CalibObjects.root"),
                            jdl["JobRange"][0], jdl["JobRange"][1], jdl["InputFilesFromList"])
 
+# Reco CPass0: TPCSPVDTime
+jdl_reco_tpcspvdtime = {}
 if "TPCSPVDTime" in jdl.get("NextStages", []):
   runNumberStr = os.path.basename(jdl["InputFilesFromList"][0])[2:11]
   jdl_reco_tpcspvdtime = \
