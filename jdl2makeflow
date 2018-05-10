@@ -101,7 +101,7 @@ for INP in "${INPUT_LIST[@]}"; do
   cp -v ../"$INP" .
 done
 {% if env_cmd -%}
-# Set custom environment (handling ourselves potential concurrency issues)
+# Set custom environment (handling potential concurrency issues on our side)
 LOCKDIR=/tmp/makeflow_env_lock
 MAXWAIT=1000
 sleep 0.1 &> /dev/null || MAXWAIT=100
@@ -113,7 +113,7 @@ set +e
 {{env_cmd}}
 ENV_RV=$?
 set -e
-rmdir $LOCKDIR
+rmdir $LOCKDIR || true
 [[ $ENV_RV == 0 ]] || exit 3
 {% else -%}
 eval $(/cvmfs/alice.cern.ch/bin/alienv printenv {{packages|join(",")}})
