@@ -200,8 +200,8 @@ touch $DONEFILE
   os.chmod(output_file, int("755", 8))
 
 def get_alien_xml(pattern, joba, jobb, input_files):
-  axml = j2env.from_string("""
-<alien>
+  axml = j2env.from_string(
+"""<alien>
   <collection name="alien_collection.xml">
     {%- for alien_counter in range(joba,jobb+1) %}
     <event name="{{alien_counter}}">
