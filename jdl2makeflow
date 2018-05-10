@@ -260,7 +260,7 @@ def get_preprocessed_jdl(jdl_fn, override={}, append={}, delete=[]):
     if jdl.get("Executable", "").endswith("aliroot_dpgsim.sh"):
       jdl["NextStages"] = [ "FinalQA", "MergeFilteredTrees" ]
     elif "/aliroot_dpg" in jdl.get("Executable", ""):
-      jdl["NextStages"] = [ "MergeMakeOCDB_CPass0" ]
+      jdl["NextStages"] = [ "MergeMakeOCDB_CPass0", "MergeFilteredTrees" ]
 
   # Job environment
   environment = {}
@@ -331,23 +331,25 @@ if "MergeMakeOCDB_CPass0" in jdl.get("NextStages", []):
                "JDLVariables": [ "CreateOCDBArchive" ] },
       delete=[ "NextStages", "JobRange" ])
   all_inputs["MergeMakeOCDB_CPass0"] = jdl_reco_mergemakeocdbcpass0["InputFile"]
-
   xml_reco = get_alien_xml(os.path.join(jdl["OutputDir"], "CalibObjects.root"),
                            jdl["JobRange"][0], jdl["JobRange"][1], jdl["InputFilesFromList"])
 
 # Second tier of jobs: merging of filtered trees
 jdl_mft = {}
 if "MergeFilteredTrees" in jdl.get("NextStages", []):
+  filtered_trees_fn = "ResidualTrees.root" if "MergeMakeOCDB_CPass0" in jdl.get("NextStages", []) else "FilterEvents_Trees.root"
   jdl_mft = get_preprocessed_jdl(args.jdl,
               override={ "Output": [ "spcm_archive.zip:pyxsec*.root,AODQA.root,AliAOD*.root,FilterEvents_Trees*.root,*.stat*,EventStat_temp*.root,Residual*.root,TOFcalibTree.root,std*,fileinfo*.log@disk=2" ],
-                         "OutputDir": os.path.join(os.path.dirname(jdl["OutputDir"]),
-                                                   "SpacePointCalibrationMerge",
+                         "OutputDir": os.path.join(os.path.dirname(preprocess_var(jdl["OutputDir"], sh_mode=False)),
+                                                   "ResidualMerge" if "MergeMakeOCDB_CPass0" else "SpacePointCalibrationMerge",
                                                    "001"),
                          "Executable": "spc_merge.sh",
+                         "LPMCollectionEntity": filtered_trees_fn,
                          "SplitArguments": "" },
-              append={ "InputFile": [ "spc_merge.sh", "spc_merge.C", "spc.xml" ] },
+              append={ "InputFile": [ "spc_merge.sh", "spc_merge.C", "spc.xml" ],
+                       "JDLVariables": [ "LPMCollectionEntity" ] },
               delete=[ "NextStages", "JobRange" ])
-  xml_mft = get_alien_xml(os.path.join(jdl["OutputDir"], "FilterEvents_Trees.root"),
+  xml_mft = get_alien_xml(os.path.join(jdl["OutputDir"], filtered_trees_fn),
                           jdl["JobRange"][0], jdl["JobRange"][1], jdl["InputFilesFromList"])
   all_inputs["MergeFilteredTrees"] = jdl_mft["InputFile"]
 
