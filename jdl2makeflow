@@ -343,11 +343,13 @@ if "MergeFilteredTrees" in jdl.get("NextStages", []):
                          "OutputDir": os.path.join(os.path.dirname(preprocess_var(jdl["OutputDir"], sh_mode=False)),
                                                    "ResidualMerge" if "MergeMakeOCDB_CPass0" else "SpacePointCalibrationMerge",
                                                    "001"),
-                         "Executable": "spc_merge.sh",
+                         "Executable": "merge.sh",
+                         "InputXML": "residualtrees.xml",
                          "LPMCollectionEntity": filtered_trees_fn,
+                         "NoGridConnect": "1",
                          "SplitArguments": "" },
-              append={ "InputFile": [ "spc_merge.sh", "spc_merge.C", "spc.xml" ],
-                       "JDLVariables": [ "LPMCollectionEntity" ] },
+              append={ "InputFile": [ "residualtrees.xml" ],
+                       "JDLVariables": [ "LPMCollectionEntity", "InputXML", "NoGridConnect" ] },
               delete=[ "NextStages", "JobRange" ])
   xml_mft = get_alien_xml(os.path.join(jdl["OutputDir"], filtered_trees_fn),
                           jdl["JobRange"][0], jdl["JobRange"][1], jdl["InputFilesFromList"])
@@ -463,8 +465,8 @@ if jdl_reco_mergemakeocdbcpass0:
   with open(os.path.join(args.work_dir, "calibobjects.xml"), "w") as f: f.write(xml_reco)
   gen_runjob(os.path.join(args.work_dir, "runmergemakeocdbcpass0.sh"), jdl_reco_mergemakeocdbcpass0, args.dry_run)
 if jdl_mft:
-  with open(os.path.join(args.work_dir, "spc.xml"), "w") as f: f.write(xml_mft)
-  gen_runjob(os.path.join(args.work_dir, "runspc.sh"), jdl_mft, args.dry_run)
+  with open(os.path.join(args.work_dir, "residualtrees.xml"), "w") as f: f.write(xml_mft)
+  gen_runjob(os.path.join(args.work_dir, "runresidualmerge.sh"), jdl_mft, args.dry_run)
 if jdl_fqa:
   with open(os.path.join(args.work_dir, inputfile_fqa), "w") as f: f.write(inputlist_fqa)
   gen_runjob(os.path.join(args.work_dir, "runfinalqa.sh"), jdl_fqa, args.dry_run)
@@ -501,8 +503,8 @@ mergemakeocdbcpass0.done: runmergemakeocdbcpass0.sh {{input_list["MergeMakeOCDB_
 {% endif -%}
 
 {% if "MergeFilteredTrees" in next_stages -%}
-mergefilteredtrees.done: runspc.sh {{input_list["MergeFilteredTrees"]|join(" ")}}{% for jobindex in range(joba,jobb) %} job{{"%04d"|format(jobindex)}}.done{% endfor %}
-	./runspc.sh 0 mergefilteredtrees.done
+mergefilteredtrees.done: runresidualmerge.sh {{input_list["MergeFilteredTrees"]|join(" ")}}{% for jobindex in range(joba,jobb) %} job{{"%04d"|format(jobindex)}}.done{% endfor %}
+	./runresidualmerge.sh 0 mergefilteredtrees.done
 {% endif -%}
 
 {% if "FinalQA" in next_stages -%}
