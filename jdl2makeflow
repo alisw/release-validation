@@ -55,6 +55,7 @@ def preprocess_var(s, sh_mode):
 def gen_runjob(output_file, jdl, dry_run):
   runjob = j2env.from_string("""#!/bin/bash -e
 type zip unzip zipinfo
+ulimit -c unlimited  # enable core dumps
 {% for v in [ "LANG", "LANGUAGE", "LC_ALL", "LC_COLLATE", "LC_CTYPE", "LC_MESSAGES", \
               "LC_MONETARY", "LC_NUMERIC", "LC_TIME", "LC_ALL" ] -%}
 export {{v}}=C
@@ -323,7 +324,8 @@ if "MergeMakeOCDB_CPass0" in jdl.get("NextStages", []):
     get_preprocessed_jdl(args.jdl,
       override={ "Output": [ "log_archive.zip:*.log@disk=2",
                              "ocdb_archive.zip:CalibObjects.root,meanITSVertex.root,fitITSVertex.root,cpassStat.root@disk=4",
-                             "OCDB.tar.bz2" ],
+                             "OCDB.tar.bz2",
+                             "core*" ],
                  "OutputDir": os.path.join(os.path.dirname(preprocess_var(jdl["OutputDir"], sh_mode=False)), "OCDB"),
                  "Executable": "aliroot_dpgMergeMakeOCDB_CPass0.sh",
                  "Arguments": "calibobjects.xml %d local://./OCDB fileAccessMethod=copyXMLcollection makeOCDB=1 calibObjectsFileName=CalibObjects.root" % runNumber,
@@ -343,7 +345,8 @@ if "TPCSPVDTime" in jdl.get("NextStages", []):
   jdl_reco_tpcspvdtime = \
     get_preprocessed_jdl(args.jdl,
       override={ "Output": [ "log_archive.zip:*.log,*.list@disk=2",
-                             "root_archive.zip:*.root@disk=2" ],
+                             "root_archive.zip:*.root@disk=2",
+                             "core*" ],
                  "OutputDir": os.path.join(os.path.dirname(preprocess_var(jdl["OutputDir"], sh_mode=False)), "ResidualMerge", "TPCSPCalibration"),
                  "Executable": "aliroot_procVDTime.sh",
                  "Arguments": "tpcSPCalibration.xml %s" % runNumberStr
@@ -360,7 +363,8 @@ jdl_mft = {}
 if "MergeFilteredTrees" in jdl.get("NextStages", []):
   filtered_trees_fn = "ResidualTrees.root" if "MergeMakeOCDB_CPass0" in jdl.get("NextStages", []) else "FilterEvents_Trees.root"
   jdl_mft = get_preprocessed_jdl(args.jdl,
-              override={ "Output": [ "spcm_archive.zip:pyxsec*.root,AODQA.root,AliAOD*.root,FilterEvents_Trees*.root,*.stat*,EventStat_temp*.root,Residual*.root,TOFcalibTree.root,std*,fileinfo*.log@disk=2" ],
+              override={ "Output": [ "spcm_archive.zip:pyxsec*.root,AODQA.root,AliAOD*.root,FilterEvents_Trees*.root,*.stat*,EventStat_temp*.root,Residual*.root,TOFcalibTree.root,std*,fileinfo*.log@disk=2",
+                                     "core*" ],
                          "OutputDir": os.path.join(os.path.dirname(preprocess_var(jdl["OutputDir"], sh_mode=False)),
                                                    "ResidualMerge" if "MergeMakeOCDB_CPass0" else "SpacePointCalibrationMerge",
                                                    "001"),
@@ -382,7 +386,8 @@ if "FinalQA" in jdl.get("NextStages", []):
   inputfile_fqa = "finalqa.txt" if jdl["DontArchive"] or jdl["SaveAll"] else "finalqa.xml"
   jdl_fqa = get_preprocessed_jdl(args.jdl,
               override={ "Output": [ "QA_merge_log_archive.zip:std*,fileinfo*.log@disk=1",
-                                     "QA_merge_archive.zip:*QAresults*.root,EventStat_temp*.root,trending*.root,event_stat*.root,*.stat*@disk=3" ],
+                                     "QA_merge_archive.zip:*QAresults*.root,EventStat_temp*.root,trending*.root,event_stat*.root,*.stat*@disk=3",
+                                     "core*" ],
                          "OutputDir": os.path.join(os.path.dirname(jdl["OutputDir"])),
                          "Executable": "train_merge.sh",
                          "SplitArguments": "%s 5" % inputfile_fqa},  # 5 is the stage number
@@ -402,7 +407,7 @@ if "FinalQA" in jdl.get("NextStages", []):
                 if jdl["DontArchive"] or jdl["SaveAll"] else \
                [ "QA_merge_archive.zip" ]
   jdl_qap = get_preprocessed_jdl(args.jdl,
-              override={ "Output": [ "qa_plots/*", "std*" ],
+              override={ "Output": [ "qa_plots/*", "std*", "core*" ],
                          "OutputDir": os.path.join(os.path.dirname(jdl["OutputDir"]), "QAplots_passMC"),
                          "Executable": "qa_plots.sh",
                          "SplitArguments": " ".join([ os.path.join(os.path.dirname(jdl["OutputDir"]), x) for x in qap_inputs ]) },
