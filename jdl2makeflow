@@ -379,9 +379,13 @@ if "TPCSPVDTime" in jdl.get("NextStages", []):
                              "core*" ],
                  "OutputDir": os.path.join(os.path.dirname(preprocess_var(jdl["OutputDir"], sh_mode=False)), "ResidualMerge", "TPCSPCalibration"),
                  "Executable": "aliroot_procVDTime.sh",
-                 "Arguments": "tpcSPCalibration.xml %s" % runNumberStr
+                 "Arguments": "tpcSPCalibration.xml %s" % runNumberStr,
+                 "targetOCDBDir": "local://./OCDB",  # output for OCDB files, it's "same" (raw://) on the Grid (OCDB is prepopulated from tarball)
+                 "useTOFBC": "false"
                },
-      append={ "InputFile"   : [ "tpcSPCalibration.xml" ] },
+      append={ "InputFile": [ "tpcSPCalibration.xml",
+                              os.path.join(os.path.dirname(preprocess_var(jdl["OutputDir"], sh_mode=False)), "OCDB", "OCDB.tar.bz2,unpack") ],
+               "JDLVariables": [ "targetOCDBDir", "useTOFBC" ] },
       delete=[ "NextStages", "JobRange" ])
   all_inputs["TPCSPVDTime"] = jdl_reco_tpcspvdtime["InputFile"]
   xml_tpcspcalibration = get_alien_xml(
