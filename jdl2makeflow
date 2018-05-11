@@ -93,14 +93,43 @@ rm -rf job-$JOBDIR
 mkdir job-$JOBDIR
 cd job-$JOBDIR
 INPUT_LIST=({% for x in input_list -%}
-             "{{x}}"
-             {% endfor %})
+            "{{x}}"
+            {% endfor %})
 OUTPUT_LIST=({% for x in output_list -%}
              "{{x}}"
              {% endfor %})
 for INP in "${INPUT_LIST[@]}"; do
-  cp -v ../"$INP" .
+  PROTO=${INP%%://*}
+  UNPACK=
+  [[ $PROTO != $INP ]] || { PROTO=local; [[ $INP == /* ]] || INP="../$INP"; }
+  [[ $PROTO == local || $PROTO == root ]] || { echo "Input protocol $PROTO not supported"; exit 1; }
+  [[ $INP == *,unpack ]] && { UNPACK=1; INP=${INP//,unpack}; }
+  for ((I=1; I<=5; I++)); do
+    ERR=0
+    echo "Transferring $INP to the input box (attempt $I/5)"
+    case $PROTO in
+      local) cp -v "$INP" . && break || ERR=$? ;;
+      root)  xrdcp -f "$INP" . && break || ERR=$? ;;
+    esac
+  done
+  [[ $ERR == 0 ]] || { echo "Error copying files into the input box"; exit 1; }
+  if [[ $UNPACK ]]; then
+    INP=${INP##*/}
+    echo "Unpacking then removing $INP"
+    case "$INP" in
+      *.tar.bz2) UNPACK_CMD="tar xjvvf" ;;
+      *.tar.gz)  UNPACK_CMD="tar xzvvf" ;;
+      *.zip)     UNPACK_CMD="unzip"     ;;
+      *) echo "Unsupported archive format: $INP"; exit 1; ;;
+    esac
+    $UNPACK_CMD "$INP" || ERR=$?
+    rm -f "$INP"
+  fi
+  [[ $ERR == 0 ]] || { echo "Error unpacking files into the input box"; exit 1; }
 done
+echo "List of files in the working directory (recursive)"
+find . -ls
+echo "List of files ends here"
 {% if env_cmd -%}
 # Set custom environment (handling potential concurrency issues on our side)
 LOCKDIR=/tmp/makeflow_env_lock
@@ -249,7 +278,8 @@ def get_preprocessed_jdl(jdl_fn, override={}, append={}, delete=[]):
   jdl["Output"] = [ o.split("@", 1)[0] for o in jdl["Output"] ]
 
   # Input list: base path only (assume files are in the cwd or a "system" one), exclude OCDB
-  jdl["InputFile"] = [ os.path.basename(x) for x in jdl.get("InputFile", []) ]
+  jdl["InputFile"] = [ os.path.basename(x) if x.startswith("LF:") else x
+                       for x in jdl.get("InputFile", []) ]
   jdl["InputFile"] = [ x for x in jdl["InputFile"] if not x.startswith("OCDB") ]
 
   # Process appends
@@ -507,7 +537,7 @@ if jdl_fqa:
 # Copy input files in the work directory
 for f in [ i for k in all_inputs for i in all_inputs[k] ]:
   dest = os.path.join(args.work_dir, f)
-  if os.path.isfile(dest): continue
+  if os.path.isfile(dest) or re.search("^(/|[^ :]+:)", f): continue
   try:
     copy2(f, dest)  # current dir first
   except:
@@ -517,6 +547,10 @@ for f in [ i for k in all_inputs for i in all_inputs[k] ]:
       print("Cannot copy input file \"%s\", please make it available in the current directory"
             " or remove it from the JDL" % f)
       exit(1)
+
+# Remove from the list files that should not be copied by Makeflow
+for k in dict(all_inputs):
+  all_inputs[k] = [ i for i in all_inputs[k] if not re.search("^(/|[^ :]+:)", i) ]
 
 # Produce the wrapper script for the jobs
 gen_runjob(os.path.join(args.work_dir, "runjob.sh"), jdl, args.dry_run)
