@@ -21,7 +21,7 @@ ap.add_argument("--parse-jdl", "-p", dest="parse_jdl", default=False, action="st
 ap.add_argument("--summary", "-s", dest="summary", default=False, action="store_true",
                 help="Only show summary without creating any file and exit")
 ap.add_argument("--start-at", "-t", dest="start_at", default=None,
-                choices=["sim", "merge", "qaplots", "cpass0", "cpass0merge", "tpcspvdtime" ],
+                choices=["sim", "merge", "qaplots", "cpass0", "cpass0merge", "tpcspc" ],
                 help="Start at the defined stage, assuming the previous stages were successful")
 ap.add_argument("--force", dest="force", default=False, action="store_true",
                 help="Force removal of working directory (you will lose files!)")
@@ -578,7 +578,7 @@ mergefilteredtrees.done: runresidualmerge.sh {{input_list["MergeFilteredTrees"]|
 {% endif -%}
 
 {% if "TPCSPVDTime" in next_stages -%}
-tpcspvdtime.done: runtpcspvdtime.sh {{input_list["TPCSPVDTime"]|join(" ")}} mergefilteredtrees.done
+tpcspvdtime.done: runtpcspvdtime.sh {{input_list["TPCSPVDTime"]|join(" ")}} mergefilteredtrees.done mergemakeocdbcpass0.done
 	./runtpcspvdtime.sh 0 tpcspvdtime.done
 {% endif -%}
 
@@ -612,10 +612,10 @@ if not args.run:
   """ % { "workdir": args.work_dir, "makeflow_opts": " ".join(args.makeflow_opts) })
 
 # Touch placeholder files to skip earlier stages
-if args.start_at in [ "merge", "qaplots", "cpass0merge", "tpcspvdtime" ]:
+if args.start_at in [ "merge", "qaplots", "cpass0merge", "tpcspc" ]:
   for jobindex in range(jdl["JobRange"][0], jdl["JobRange"][1]+1):
     open(os.path.join(args.work_dir, "job%04d.done"%jobindex), "w").close()
-if args.start_at == "tpcspvdtime":
+if args.start_at == "tpcspc":
   for done in [ "mergemakeocdbcpass0.done", "mergefilteredtrees.done" ]:
     open(os.path.join(args.work_dir, done), "w").close()
 if args.start_at == "qaplots":
