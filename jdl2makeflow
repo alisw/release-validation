@@ -21,7 +21,7 @@ ap.add_argument("--parse-jdl", "-p", dest="parse_jdl", default=False, action="st
 ap.add_argument("--summary", "-s", dest="summary", default=False, action="store_true",
                 help="Only show summary without creating any file and exit")
 ap.add_argument("--start-at", "-t", dest="start_at", default=None,
-                choices=["sim", "merge", "qaplots", "cpass0", "cpass0merge", "tpcspc" ],
+                choices=["sim", "merge", "qaplots", "cpass0", "cpass0merge", "tpcspc", "cpass1" ],
                 help="Start at the defined stage, assuming the previous stages were successful")
 ap.add_argument("--force", dest="force", default=False, action="store_true",
                 help="Force removal of working directory (you will lose files!)")
@@ -292,7 +292,8 @@ def get_preprocessed_jdl(jdl_fn, override={}, append={}, delete=[]):
       jdl["NextStages"] = [ "FinalQA", "MergeFilteredTrees" ]
     elif "/aliroot_dpg" in jdl.get("Executable", ""):
       jdl["NextStages"] = [ "MergeMakeOCDB_CPass0", "MergeFilteredTrees",
-                            "TPCSPVDTime" ]
+                            "TPCSPVDTime",
+                            "CPass1" ]
 
   # Job environment
   environment = {}
@@ -363,7 +364,7 @@ if "MergeMakeOCDB_CPass0" in jdl.get("NextStages", []):
                },
       append={ "InputFile"   : [ "calibobjects.xml" ],
                "JDLVariables": [ "CreateOCDBArchive" ] },
-      delete=[ "NextStages", "JobRange" ])
+      delete=[ "NextStages", "JobRange", "InputFilesFromList" ])
   all_inputs["MergeMakeOCDB_CPass0"] = jdl_reco_mergemakeocdbcpass0["InputFile"]
   xml_reco = get_alien_xml(os.path.join(jdl["OutputDir"], "CalibObjects.root"),
                            jdl["JobRange"][0], jdl["JobRange"][1], jdl["InputFilesFromList"])
@@ -386,11 +387,34 @@ if "TPCSPVDTime" in jdl.get("NextStages", []):
       append={ "InputFile": [ "tpcSPCalibration.xml",
                               os.path.join(os.path.dirname(preprocess_var(jdl["OutputDir"], sh_mode=False)), "OCDB", "OCDB.tar.bz2,unpack") ],
                "JDLVariables": [ "targetOCDBDir", "useTOFBC" ] },
-      delete=[ "NextStages", "JobRange" ])
+      delete=[ "NextStages", "JobRange", "InputFilesFromList" ])
   all_inputs["TPCSPVDTime"] = jdl_reco_tpcspvdtime["InputFile"]
   xml_tpcspcalibration = get_alien_xml(
     os.path.join(os.path.dirname(preprocess_var(jdl["OutputDir"], sh_mode=False)), "ResidualMerge", "001", "ResidualTrees.root"),
     0, 0, [])
+
+# Reco CPass1
+jdl_reco_cpass1 = {}
+if "CPass1" in jdl.get("NextStages", []):
+  jdl_reco_cpass1 = \
+    get_preprocessed_jdl(args.jdl,
+      override={ "Output": [ "log_archive.zip:qa*.log,calib.log,filtering.log,mergeQA_outer.log,mergeQA_barrel.log,rec.log,stderr.log,stdout.log@disk=1",
+                             "root_archive.zip:AliESDs_Barrel.root,CalibObjects.root,*.ESD.tag.root,TOFcalibTree.root,T0AnalysisTree.root@disk=2",
+                             "QA_archive.zip:QAresults_barrel.root,QAresults_outer.root,*.stat.qa*@disk=2",
+                             "EventStat_temp*.root@disk=2",
+                             "ResidualTrees.root@disk=2",
+                             "FilterEvents_Trees.root@disk=2",
+                             "core*" ],
+                 "OutputDir": jdl["OutputDir"].replace("/cpass0_pass1/", "/cpass1_pass1/"),
+                 "Executable": "aliroot_dpgCPass1.sh",
+                 "LPMPass": "1",
+                 "LPMPassName": "cpass1_pass1",
+                 "LPMRAWPassID": "1",
+                 "LPMCPassMode": "1"
+               },
+      append={ "InputFile"   : [ os.path.join(os.path.dirname(preprocess_var(jdl["OutputDir"], sh_mode=False)), "OCDB", "OCDB.tar.bz2,unpack") ] },
+      delete=[ "NextStages", "JobRange" ])
+  all_inputs["CPass1"] = jdl_reco_cpass1["InputFile"]
 
 # Second tier of jobs: merging of filtered trees
 jdl_mft = {}
@@ -409,7 +433,7 @@ if "MergeFilteredTrees" in jdl.get("NextStages", []):
                          "SplitArguments": "" },
               append={ "InputFile": [ "residualtrees.xml" ],
                        "JDLVariables": [ "LPMCollectionEntity", "InputXML", "NoGridConnect" ] },
-              delete=[ "NextStages", "JobRange" ])
+              delete=[ "NextStages", "JobRange", "InputFilesFromList" ])
   xml_mft = get_alien_xml(os.path.join(jdl["OutputDir"], filtered_trees_fn),
                           jdl["JobRange"][0], jdl["JobRange"][1], jdl["InputFilesFromList"])
   all_inputs["MergeFilteredTrees"] = jdl_mft["InputFile"]
@@ -446,7 +470,7 @@ if "FinalQA" in jdl.get("NextStages", []):
                          "Executable": "qa_plots.sh",
                          "SplitArguments": " ".join([ os.path.join(os.path.dirname(jdl["OutputDir"]), x) for x in qap_inputs ]) },
               append={ "InputFile": [ "qa_plots.sh" ] },
-              delete=[ "NextStages", "JobRange" ])
+              delete=[ "NextStages", "JobRange", "InputFilesFromList" ])
   all_inputs["QAPlots"] = jdl_qap["InputFile"]
 
 if args.parse_jdl:
@@ -455,12 +479,15 @@ if args.parse_jdl:
   if jdl_reco_mergemakeocdbcpass0:
     print("\n# Reco CPass0: merge and make OCDB")
     print(json.dumps(jdl_reco_mergemakeocdbcpass0, indent=2))
-  if jdl_reco_tpcspvdtime:
-    print("\n# Reco CPass0: TPCSPVDTime")
-    print(json.dumps(jdl_reco_tpcspvdtime, indent=2))
   if jdl_mft:
     print("\n# Merging of filtered trees")
     print(json.dumps(jdl_mft, indent=2))
+  if jdl_reco_tpcspvdtime:
+    print("\n# Reco CPass0: TPCSPVDTime")
+    print(json.dumps(jdl_reco_tpcspvdtime, indent=2))
+  if jdl_reco_cpass1:
+    print("\n# Reco CPass1")
+    print(json.dumps(jdl_reco_cpass1, indent=2))
   if jdl_fqa:
     print("\n# Final QA")
     print(json.dumps(jdl_fqa, indent=2))
@@ -527,12 +554,14 @@ except OSError as e:
 if jdl_reco_mergemakeocdbcpass0:
   with open(os.path.join(args.work_dir, "calibobjects.xml"), "w") as f: f.write(xml_reco)
   gen_runjob(os.path.join(args.work_dir, "runmergemakeocdbcpass0.sh"), jdl_reco_mergemakeocdbcpass0, args.dry_run)
-if jdl_reco_tpcspvdtime:
-  with open(os.path.join(args.work_dir, "tpcSPCalibration.xml"), "w") as f: f.write(xml_tpcspcalibration)
-  gen_runjob(os.path.join(args.work_dir, "runtpcspvdtime.sh"), jdl_reco_tpcspvdtime, args.dry_run)
 if jdl_mft:
   with open(os.path.join(args.work_dir, "residualtrees.xml"), "w") as f: f.write(xml_mft)
   gen_runjob(os.path.join(args.work_dir, "runresidualmerge.sh"), jdl_mft, args.dry_run)
+if jdl_reco_tpcspvdtime:
+  with open(os.path.join(args.work_dir, "tpcSPCalibration.xml"), "w") as f: f.write(xml_tpcspcalibration)
+  gen_runjob(os.path.join(args.work_dir, "runtpcspvdtime.sh"), jdl_reco_tpcspvdtime, args.dry_run)
+if jdl_reco_cpass1:
+  gen_runjob(os.path.join(args.work_dir, "runcpass1.sh"), jdl_reco_cpass1, args.dry_run)
 if jdl_fqa:
   with open(os.path.join(args.work_dir, inputfile_fqa), "w") as f: f.write(inputlist_fqa)
   gen_runjob(os.path.join(args.work_dir, "runfinalqa.sh"), jdl_fqa, args.dry_run)
@@ -582,6 +611,13 @@ tpcspvdtime.done: runtpcspvdtime.sh {{input_list["TPCSPVDTime"]|join(" ")}} merg
 	./runtpcspvdtime.sh 0 tpcspvdtime.done
 {% endif -%}
 
+{% if "CPass1" in next_stages -%}
+{% for jobindex in range(joba,jobb) -%}
+cpass1reco{{ "%04d"|format(jobindex) }}.done: runcpass1.sh {{input_list["CPass1"]|join(" ")}} tpcspvdtime.done
+	./runcpass1.sh {{jobindex}} cpass1reco{{"%04d"|format(jobindex)}}.done{% if input_files|length > 1 %} {{input_files[jobindex-joba]}}{% endif %}
+{% endfor -%}
+{% endif -%}
+
 {% if "FinalQA" in next_stages -%}
 finalqa.done: runfinalqa.sh {{input_list["FinalQA"]|join(" ")}}{% for jobindex in range(joba,jobb) %} job{{"%04d"|format(jobindex)}}.done{% endfor %}
 	./runfinalqa.sh 0 finalqa.done
@@ -612,12 +648,14 @@ if not args.run:
   """ % { "workdir": args.work_dir, "makeflow_opts": " ".join(args.makeflow_opts) })
 
 # Touch placeholder files to skip earlier stages
-if args.start_at in [ "merge", "qaplots", "cpass0merge", "tpcspc" ]:
+if args.start_at in [ "merge", "qaplots", "cpass0merge", "tpcspc", "cpass1" ]:
   for jobindex in range(jdl["JobRange"][0], jdl["JobRange"][1]+1):
     open(os.path.join(args.work_dir, "job%04d.done"%jobindex), "w").close()
-if args.start_at == "tpcspc":
+if args.start_at in [ "tpcspc", "cpass1" ]:
   for done in [ "mergemakeocdbcpass0.done", "mergefilteredtrees.done" ]:
     open(os.path.join(args.work_dir, done), "w").close()
+if args.start_at in [ "cpass1" ]:
+  open(os.path.join(args.work_dir, "tpcspvdtime.done"), "w").close()
 if args.start_at == "qaplots":
   for done in [ "finalqa.done", "mergefilteredtrees.done" ]:
     open(os.path.join(args.work_dir, done), "w").close()
