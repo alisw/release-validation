@@ -25,6 +25,8 @@ ap.add_argument("--start-at", "-t", dest="start_at", default=None,
                 help="Start at the defined stage, assuming the previous stages were successful")
 ap.add_argument("--force", dest="force", default=False, action="store_true",
                 help="Force removal of working directory (you will lose files!)")
+ap.add_argument("--graph", dest="graph", default=False, action="store_true",
+                help="Create dependency graph as Makeflow.pdf in the workdir")
 ap.add_argument("--run", "-r", dest="run", default=False, action="store_true",
                 help="Automatically run workflow after generating the manifest")
 ap.add_argument("jdl",
@@ -683,13 +685,15 @@ with open(makeflow_fn, "w") as mf:
                            jobb        = jdl["JobRange"][1]+1,
                            input_files = jdl["InputFilesFromList"],
                            next_stages = jdl.get("NextStages", [])))
-wd = os.getcwd()
-os.chdir(args.work_dir)
-try:
-  subprocess.check_call("makeflow_viz | dot -T pdf -o Makeflow.pdf", shell=True)
-except:
-  print("WARNING: cannot generate workflow graph")
-os.chdir(wd)
+if args.graph:
+  wd = os.getcwd()
+  os.chdir(args.work_dir)
+  try:
+    subprocess.check_call("makeflow_viz | dot -T pdf -o Makeflow.pdf", shell=True)
+  except:
+    print("ERROR: cannot generate workflow graph")
+    exit(1)
+  os.chdir(wd)
 
 if not args.run:
   print("""Execute the workflow with:
