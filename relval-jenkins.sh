@@ -8,26 +8,28 @@
 
 # List of contact persons for components and detectors
 DETECTORS=(
-  "ACORDE:mrodrigu"
-  "AD:mbroz"
-  "EMCAL:gconesab"
-  "FMD:cholm"
-  "HLT:mkrzewic"
-  "HMPID:gvolpe"
-  "ITS:masera"
-  "MUON:laphecet"
-  "PMD:bnandi"
-  "PHOS:kharlov"
-  "TOF:fnoferin"
-  "TPC:kschweda mivanov wiechula"
-  "TRD:tdietel"
-  "T0:alla"
-  "V0:cvetan"
-  "ZDC:coppedis"
-  "Reconstruction:shahoian"
-  "Calibration:zampolli"
-  "DevOps:hristov dberzano eulisse"
-  "DPG:fprino miweber cristea"
+   "ACORDE:dberzano"
+   "AFIATO:mconcas"
+#  "ACORDE:mrodrigu"
+#  "AD:mbroz"
+#  "EMCAL:gconesab"
+#  "FMD:cholm"
+#  "HLT:mkrzewic"
+#  "HMPID:gvolpe"
+#  "ITS:masera"
+#  "MUON:laphecet"
+#  "PMD:bnandi"
+#  "PHOS:kharlov"
+#  "TOF:fnoferin"
+#  "TPC:kschweda mivanov wiechula"
+#  "TRD:tdietel"
+#  "T0:alla"
+#  "V0:cvetan"
+#  "ZDC:coppedis"
+#  "Reconstruction:shahoian"
+#  "Calibration:zampolli"
+#  "DevOps:hristov dberzano eulisse"
+#  "DPG:fprino miweber cristea"
 )
 JIRA_WATCHERS=($(for D in "${DETECTORS[@]}"; do echo ${D##*:}; done | xargs -n1 echo | sort -u))
 
@@ -110,32 +112,32 @@ function eos_check_quota() {
 
 # Call this function to post a JIRA comment when the release validation starts.
 # Usage:
-#   jira_relval_started $JIRA_ISSUE $DISPLAY_URL $VERSIONS_STR $DONTTAG
+#   jira_relval_started $JIRA_ISSUE $DISPLAY_URL $VERSIONS_STR $DONTMENTION
 function jira_relval_started() {
   JIRA_ISSUE=$1
   DISPLAY_URL=$2
   VERSIONS_STR=$3
-  DONTTAG=$4
+  local DONTMENTION=$4
   jira_comment "$JIRA_ISSUE" \
                "Release validation for *${VERSIONS_STR}* started.\n" \
                " * [Jenkins log|${BUILD_URL}/console]\n" \
                " * [Validation output|${DISPLAY_URL}] (it might be still empty)\n"
-  [[ $DONTTAG != true ]] && jira_watchers "$JIRA_ISSUE" "${JIRA_WATCHERS[@]}" || true
+  [[ $DONTMENTION != true ]] && jira_watchers "$JIRA_ISSUE" "${JIRA_WATCHERS[@]}" || true
 }
 
 # Call this function to post a JIRA comment when the release validation is done.
 # Usage:
-#   jira_relval_finished $JIRA_ISSUE $EXITCODE $DISPLAY_URL $VERSIONS_STR $DONTTAG
+#   jira_relval_finished $JIRA_ISSUE $EXITCODE $DISPLAY_URL $VERSIONS_STR $DONTMENTION
 function jira_relval_finished() {
   JIRA_ISSUE=$1
   EXITCODE=$2
   DISPLAY_URL=$3
   VERSIONS_STR=$4
-  DONTTAG=$5
+  local DONTMENTION=$5
   [[ $EXITCODE == 0 ]] && JIRASTATUS="*{color:green}success{color}*" \
                       || JIRASTATUS="*{color:red}errors{color}*"
   TAGFMT='[~%s]'
-  [[ $DONTTAG == true ]] && TAGFMT='{{~%s}}'
+  [[ $DONTMENTION == true ]] && TAGFMT='{{~%s}}'
   jira_comment "$JIRA_ISSUE"                                                                         \
     "Release validation for *${VERSIONS_STR}* finished with ${JIRASTATUS}.\n"           \
     " * [Jenkins log|$BUILD_URL/console]\n"                                                          \

@@ -190,6 +190,7 @@ node("$RUN_ARCH-relval") {
            "CVMFS_NAMESPACE=$CVMFS_NAMESPACE",
            "DATASET=$DATASET",
            "DRYRUN=$DRYRUN",
+           "DONTMENTION=$DONT_MENTION",
            "MONKEYPATCH_TARBALL_URL=$MONKEYPATCH_TARBALL_URL",
            "REQUIRED_SPACE_GB=$REQUIRED_SPACE_GB",
            "REQUIRED_FILES=$REQUIRED_FILES",
@@ -277,11 +278,16 @@ node("$RUN_ARCH-relval") {
           exit 1
         fi
         # Check dryrun case
-        if [[ ${DRYRUN} == true ]] &&  RUN_DRYRUN="--dryrun" || true
+        if [[ ${DRYRUN} == true ]]; then
+          RUN_DRYRUN="--dryrun"
+          DONTMENTION=true
+        else true
+        fi
         # Start the Release Validation (notify on JIRA before and after)
-        jira_relval_started  "$JIRA_ISSUE" "$OUTPUT_URL" "${TAGS// /, }" $DRYRUN || true
-        jdl2makeflow ${RUN_DRYRUN} --force --run $JDL -T wq -N alirelval_${RELVAL_NAME} -r 3 -C wqcatalog.marathon.mesos:9097 || RV=$?
-        jira_relval_finished "$JIRA_ISSUE" $RV "$OUTPUT_URL" "${TAGS// /, }" $DRYRUN || true
+        jira_relval_started  "$JIRA_ISSUE" "$OUTPUT_URL" "${TAGS// /, }" $DONTMENTION || true
+        echo ">>>>>>>>>>> $DRYRUN >>>>>> ${DRYRUN} >>>>>>>"
+        echo jdl2makeflow ${RUN_DRYRUN} --force --run $JDL -T wq -N alirelval_${RELVAL_NAME} -r 3 -C wqcatalog.marathon.mesos:9097 || RV=$?
+        jira_relval_finished "$JIRA_ISSUE" $RV "$OUTPUT_URL" "${TAGS// /, }" $DONTMENTION || true
         exit $RV
       '''
     }
