@@ -8,28 +8,26 @@
 
 # List of contact persons for components and detectors
 DETECTORS=(
-   "ACORDE:dberzano"
-   "AFIATO:mconcas"
-#  "ACORDE:mrodrigu"
-#  "AD:mbroz"
-#  "EMCAL:gconesab"
-#  "FMD:cholm"
-#  "HLT:mkrzewic"
-#  "HMPID:gvolpe"
-#  "ITS:masera"
-#  "MUON:laphecet"
-#  "PMD:bnandi"
-#  "PHOS:kharlov"
-#  "TOF:fnoferin"
-#  "TPC:kschweda mivanov wiechula"
-#  "TRD:tdietel"
-#  "T0:alla"
-#  "V0:cvetan"
-#  "ZDC:coppedis"
-#  "Reconstruction:shahoian"
-#  "Calibration:zampolli"
-#  "DevOps:hristov dberzano eulisse"
-#  "DPG:fprino miweber cristea"
+  "ACORDE:mrodrigu"
+  "AD:mbroz"
+  "EMCAL:gconesab"
+  "FMD:cholm"
+  "HLT:mkrzewic"
+  "HMPID:gvolpe"
+  "ITS:masera"
+  "MUON:laphecet"
+  "PMD:bnandi"
+  "PHOS:kharlov"
+  "TOF:fnoferin"
+  "TPC:kschweda mivanov wiechula"
+  "TRD:tdietel"
+  "T0:alla"
+  "V0:cvetan"
+  "ZDC:coppedis"
+  "Reconstruction:shahoian"
+  "Calibration:zampolli"
+  "DevOps:hristov dberzano eulisse"
+  "DPG:fprino miweber cristea"
 )
 JIRA_WATCHERS=($(for D in "${DETECTORS[@]}"; do echo ${D##*:}; done | xargs -n1 echo | sort -u))
 
@@ -114,28 +112,29 @@ function eos_check_quota() {
 # Usage:
 #   jira_relval_started $JIRA_ISSUE $DISPLAY_URL $VERSIONS_STR $DONTMENTION
 function jira_relval_started() {
-  JIRA_ISSUE=$1
-  DISPLAY_URL=$2
-  VERSIONS_STR=$3
+  local JIRA_ISSUE=$1
+  local DISPLAY_URL=$2
+  local VERSIONS_STR=$3
   local DONTMENTION=$4
   jira_comment "$JIRA_ISSUE" \
                "Release validation for *${VERSIONS_STR}* started.\n" \
                " * [Jenkins log|${BUILD_URL}/console]\n" \
                " * [Validation output|${DISPLAY_URL}] (it might be still empty)\n"
   [[ $DONTMENTION != true ]] && jira_watchers "$JIRA_ISSUE" "${JIRA_WATCHERS[@]}" || true
+  return 0
 }
 
 # Call this function to post a JIRA comment when the release validation is done.
 # Usage:
 #   jira_relval_finished $JIRA_ISSUE $EXITCODE $DISPLAY_URL $VERSIONS_STR $DONTMENTION
 function jira_relval_finished() {
-  JIRA_ISSUE=$1
-  EXITCODE=$2
-  DISPLAY_URL=$3
-  VERSIONS_STR=$4
+  local JIRA_ISSUE=$1
+  local EXITCODE=$2
+  local DISPLAY_URL=$3
+  local VERSIONS_STR=$4
   local DONTMENTION=$5
   [[ $EXITCODE == 0 ]] && JIRASTATUS="*{color:green}success{color}*" \
-                      || JIRASTATUS="*{color:red}errors{color}*"
+                       || JIRASTATUS="*{color:red}errors{color}*"
   TAGFMT='[~%s]'
   [[ $DONTMENTION == true ]] && TAGFMT='{{~%s}}'
   jira_comment "$JIRA_ISSUE"                                                                         \
@@ -149,4 +148,5 @@ function jira_relval_finished() {
     "$(for D in "${DETECTORS[@]}"; do
          printf " * ${D%%:*}:"; for R in ${D#*:}; do printf " $TAGFMT" "$R"; done; echo -n "\n"
        done)"
+   return 0
 }

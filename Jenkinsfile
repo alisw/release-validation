@@ -277,16 +277,14 @@ node("$RUN_ARCH-relval") {
           echo "This JDL does not belong to a Monte Carlo. Not supported."
           exit 1
         fi
-        # Check dryrun case
-        if [[ ${DRYRUN} == true ]]; then
+        if [[ $DRYRUN == true ]]; then
           RUN_DRYRUN="--dryrun"
           DONTMENTION=true
-        else true
         fi
         # Start the Release Validation (notify on JIRA before and after)
-        jira_relval_started  "$JIRA_ISSUE" "$OUTPUT_URL" "${TAGS// /, }" $DONTMENTION || true
-        echo ">>>>>>>>>>> $DRYRUN >>>>>> ${DRYRUN} >>>>>>>"
-        echo jdl2makeflow ${RUN_DRYRUN} --force --run $JDL -T wq -N alirelval_${RELVAL_NAME} -r 3 -C wqcatalog.marathon.mesos:9097 || RV=$?
+        jira_relval_started  "$JIRA_ISSUE" "$OUTPUT_URL" "${TAGS// /, }" "$DONTMENTION" || true
+        RV=0
+        jdl2makeflow ${RUN_DRYRUN} --force --run $JDL -T wq -N alirelval_${RELVAL_NAME} -r 3 -C wqcatalog.marathon.mesos:9097 || RV=$?
         jira_relval_finished "$JIRA_ISSUE" $RV "$OUTPUT_URL" "${TAGS// /, }" $DONTMENTION || true
         exit $RV
       '''
