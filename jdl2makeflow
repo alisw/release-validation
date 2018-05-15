@@ -21,7 +21,7 @@ ap.add_argument("--parse-jdl", "-p", dest="parse_jdl", default=False, action="st
 ap.add_argument("--summary", "-s", dest="summary", default=False, action="store_true",
                 help="Only show summary without creating any file and exit")
 ap.add_argument("--start-at", "-t", dest="start_at", default=None,
-                choices=["sim", "merge", "qaplots", "cpass0", "cpass0merge", "tpcspc", "cpass1", "cpass1merge" ],
+                choices=["sim", "merge", "qaplots", "cpass0", "cpass0merge", "tpcspc", "cpass1", "cpass1merge", "cpass1qa", "cpass1qaplots" ],
                 help="Start at the defined stage, assuming the previous stages were successful")
 ap.add_argument("--force", dest="force", default=False, action="store_true",
                 help="Force removal of working directory (you will lose files!)")
@@ -304,7 +304,8 @@ def get_preprocessed_jdl(jdl_fn, override={}, append={}, delete=[]):
       jdl["NextStages"] = [ "MergeMakeOCDB_CPass0", "MergeFilteredTrees",
                             "TPCSPVDTime",
                             "CPass1",
-                            "MergeMakeOCDB_CPass1" ]
+                            "MergeMakeOCDB_CPass1",
+                            "FinalQA" ]
 
   # Job environment
   environment = {}
@@ -481,24 +482,27 @@ if "MergeFilteredTrees" in jdl.get("NextStages", []):
 # Second tier of jobs: FinalQA
 jdl_fqa = {}
 if "FinalQA" in jdl.get("NextStages", []):
+  isMC = not "CPass1" in jdl.get("NextStages", [])
+  jdl_base = jdl if isMC else jdl_reco_cpass1  # do it for CPass1 on reconstruction
   inputfile_fqa = "finalqa.txt" if jdl["DontArchive"] or jdl["SaveAll"] else "finalqa.xml"
   jdl_fqa = get_preprocessed_jdl(args.jdl,
               override={ "Output": [ "QA_merge_log_archive.zip:std*,fileinfo*.log@disk=1",
                                      "QA_merge_archive.zip:*QAresults*.root,EventStat_temp*.root,trending*.root,event_stat*.root,*.stat*@disk=3",
                                      "validation_report.txt",
                                      "core*" ],
-                         "OutputDir": os.path.join(os.path.dirname(jdl["OutputDir"])),
-                         "Executable": "train_merge.sh",
-                         "SplitArguments": "%s 5" % inputfile_fqa},  # 5 is the stage number
-              append={ "InputFile": [ "train_merge.sh", inputfile_fqa ] },
+                         "OutputDir": os.path.dirname(preprocess_var(jdl_base["OutputDir"], sh_mode=False)),
+                         "Executable": "aliprod_train_merge.sh" if isMC else "train_merge.sh",
+                         "SplitArguments": "%s 5" % inputfile_fqa},  # 5 means "final stage"
+              append={ "InputFile": [ inputfile_fqa ] + ([ "aliprod_train_merge.sh" ] if isMC else []) },
               delete=[ "NextStages", "JobRange" ])
   if inputfile_fqa.endswith(".xml"):
-    inputlist_fqa = get_alien_xml(os.path.join(jdl["OutputDir"], "QA_archive.zip"),
-                            jdl["JobRange"][0], jdl["JobRange"][1], jdl["InputFilesFromList"])
+    inputlist_fqa = get_alien_xml(os.path.join(jdl_base["OutputDir"], "QA_archive.zip"),
+                                  jdl_base["JobRange"][0], jdl_base["JobRange"][1],
+                                  jdl_base["InputFilesFromList"])
   else:
-    pattern = preprocess_var(jdl["OutputDir"], sh_mode=False)
-    inputlist_fqa = "\n".join([ j2env.from_string(pattern).render(alien_counter=ji)
-                                for ji in range(jdl["JobRange"][0], jdl["JobRange"][1]+1) ]) + "\n"
+    pattern = preprocess_var(jdl_base["OutputDir"], sh_mode=False)
+    inputlist_fqa = "\n".join([ j2env.from_string(pattern).render(alien_counter=ji, input_files=jdl_base["InputFilesFromList"])
+                                for ji in range(jdl_base["JobRange"][0], jdl_base["JobRange"][1]+1) ]) + "\n"
   all_inputs["FinalQA"] = jdl_fqa["InputFile"]
   qap_inputs = [ "QAresults.root", "QAresults_merged.root", "QAresults_barrel.root",
                  "QAresults_outer.root", "FilterEvents_Trees.root", "event_stat.root",
@@ -507,9 +511,9 @@ if "FinalQA" in jdl.get("NextStages", []):
                [ "QA_merge_archive.zip" ]
   jdl_qap = get_preprocessed_jdl(args.jdl,
               override={ "Output": [ "qa_plots/*", "std*", "core*", "validation_report.txt" ],
-                         "OutputDir": os.path.join(os.path.dirname(jdl["OutputDir"]), "QAplots_passMC"),
+                         "OutputDir": os.path.join(os.path.dirname(preprocess_var(jdl_base["OutputDir"], sh_mode=False)), "QAplots_passMC" if isMC else "QAPlots_CPass1"),
                          "Executable": "qa_plots.sh",
-                         "SplitArguments": " ".join([ os.path.join(os.path.dirname(jdl["OutputDir"]), x) for x in qap_inputs ]) },
+                         "SplitArguments": " ".join([ os.path.join(preprocess_var(os.path.dirname(jdl_base["OutputDir"]), sh_mode=False), x) for x in qap_inputs ]) },
               append={ "InputFile": [ "qa_plots.sh" ] },
               delete=[ "NextStages", "JobRange", "InputFilesFromList" ])
   all_inputs["QAPlots"] = jdl_qap["InputFile"]
@@ -671,7 +675,7 @@ mergemakeocdbcpass1.done: runmergemakeocdbcpass1.sh {{input_list["MergeMakeOCDB_
 {% endif -%}
 
 {% if "FinalQA" in next_stages -%}
-finalqa.done: runfinalqa.sh {{input_list["FinalQA"]|join(" ")}}{% for jobindex in range(joba,jobb) %} job{{"%04d"|format(jobindex)}}.done{% endfor %}
+finalqa.done: runfinalqa.sh {{input_list["FinalQA"]|join(" ")}}{% for jobindex in range(joba,jobb) %} {% if "CPass1" in next_stages -%}cpass1reco{% else %}job{% endif %}{{"%04d"|format(jobindex)}}.done{% endfor %}
 	./runfinalqa.sh 0 finalqa.done
 qaplots.done: runqaplots.sh finalqa.done {{input_list["QAPlots"]|join(" ")}}
 	./runqaplots.sh 0 qaplots.done
@@ -702,20 +706,24 @@ if not args.run:
   """ % { "workdir": args.work_dir, "makeflow_opts": " ".join(args.makeflow_opts) })
 
 # Touch placeholder files to skip earlier stages
-if args.start_at in [ "merge", "qaplots", "cpass0merge", "tpcspc", "cpass1", "cpass1merge" ]:
+if args.start_at in [ "merge", "qaplots", "cpass0merge", "tpcspc", "cpass1", "cpass1merge", "cpass1qa", "cpass1qaplots" ]:
   for jobindex in range(jdl["JobRange"][0], jdl["JobRange"][1]+1):
     open(os.path.join(args.work_dir, "job%04d.done"%jobindex), "w").close()
-if args.start_at in [ "tpcspc", "cpass1", "cpass1merge" ]:
+if args.start_at in [ "tpcspc", "cpass1", "cpass1merge", "cpass1qa", "cpass1qaplots" ]:
   for done in [ "mergemakeocdbcpass0.done", "mergefilteredtrees.done" ]:
     open(os.path.join(args.work_dir, done), "w").close()
-if args.start_at in [ "cpass1", "cpass1merge" ]:
+if args.start_at in [ "cpass1", "cpass1merge", "cpass1qa", "cpass1qaplots" ]:
   open(os.path.join(args.work_dir, "tpcspvdtime.done"), "w").close()
-if args.start_at in [ "cpass1merge" ]:
+if args.start_at in [ "cpass1merge", "cpass1qa", "cpass1qaplots" ]:
   for jobindex in range(jdl_reco_cpass1["JobRange"][0], jdl_reco_cpass1["JobRange"][1]+1):
     open(os.path.join(args.work_dir, "cpass1reco%04d.done"%jobindex), "w").close()
 if args.start_at == "qaplots":
   for done in [ "finalqa.done", "mergefilteredtrees.done" ]:
     open(os.path.join(args.work_dir, done), "w").close()
+if args.start_at in [ "cpass1qa", "cpass1qaplots" ]:
+  open(os.path.join(args.work_dir, "mergemakeocdbcpass1.done"), "w").close()
+if args.start_at == "cpass1qaplots":
+  open(os.path.join(args.work_dir, "finalqa.done"), "w").close()
 
 # Run Makeflow in dryrun mode to pretend we have completed the earlier stages
 if args.start_at != "sim" and args.start_at != "cpass0":
