@@ -16,8 +16,10 @@ ap.add_argument("--dryrun", "-n", dest="dry_run", default=False, action="store_t
                 help="Generate Makeflow script that does not actually run any job")
 ap.add_argument("--workdir", "-w", dest="work_dir", default="work",
                 help="Makeflow work directory (defaults to \"work\")")
-ap.add_argument("--parse-jdl", "-p", dest="parse_jdl", default=False, action="store_true",
-                help="Only parse the JDL, show the result and exit")
+ap.add_argument("--parse", dest="parse", default=False, action="store_true",
+                help="Show all JDLs in JSON format before generating the Makeflow")
+ap.add_argument("--parse-only", "-p", dest="parse_only", default=False, action="store_true",
+                help="Only show JDLs in JSON format and quit")
 ap.add_argument("--summary", "-s", dest="summary", default=False, action="store_true",
                 help="Only show summary without creating any file and exit")
 ap.add_argument("--start-at", "-t", dest="start_at", default=None,
@@ -518,7 +520,7 @@ if "FinalQA" in jdl.get("NextStages", []):
               delete=[ "NextStages", "JobRange", "InputFilesFromList" ])
   all_inputs["QAPlots"] = jdl_qap["InputFile"]
 
-if args.parse_jdl:
+if args.parse or args.parse_only:
   print("# First tier of jobs")
   print(json.dumps(jdl, indent=2))
   if jdl_reco_mergemakeocdbcpass0:
@@ -541,7 +543,8 @@ if args.parse_jdl:
     print(json.dumps(jdl_fqa, indent=2))
     print("\n# QA Plots")
     print(json.dumps(jdl_qap, indent=2))
-  exit(0)
+  if args.parse_only:
+    exit(0)
 
 # Summary
 print("""Running the workflow with the following configuration:
