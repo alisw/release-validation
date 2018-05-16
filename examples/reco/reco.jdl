@@ -1,0 +1,108 @@
+
+
+User = "alidaq";
+JobTag = {
+"comment:LHC period LHC17r - CPass0 (reconstruction) for pass 1, ALIROOT-7604"
+};
+Packages = {
+"VO_ALICE@AliDPG::v5-09-XX-28",
+"VO_ALICE@AliPhysics::v5-09-18a-01-1",
+"VO_ALICE@APISCONFIG::V1.1x",
+"VO_ALICE@jemalloc::v3.6.0"
+};
+Executable = "/alice/cern.ch/user/a/alidaq/bin/aliroot_dpgCPass0.sh";
+InputFile = {
+"LF:/alice/validation/cpass/0/validation.rc",
+"LF:/alice/data/2017/LHC17r/000282704/cpass0_pass1/OCDB.root"
+};
+InputDataCollection = "LF:/alice/data/2017/LHC17r/000282704/collection";
+Split = "file";
+SplitArguments = {
+"/alice/data/2017/LHC17r/000282704/raw/#alienfilename#"
+};
+JDLPath = "/alice/cern.ch/user/a/alidaq/LHC17r/rec_pass0.jdl";
+JDLArguments = "000282704";
+JDLProcessor = "alien.repository.LPMSubmissionPass";
+ValidationCommand = "/alice/validation/validation.sh";
+OutputDir = "/alice/data/2017/LHC17r/000282704/cpass0_pass1/#alienfilename/.root//#";
+Output = {
+"log_archive.zip:*.log@disk=1",
+"root_archive.zip:CalibObjects.root,*.ESD.tag.root@disk=2",
+"ResidualTrees.root@disk=2"
+};
+Requirements = ( member(other.Packages,"VO_ALICE@AliDPG::v5-09-XX-28") ) && ( member(other.Packages,"VO_ALICE@AliPhysics::v5-09-18-01-1") ) && ( member(other.Packages,"VO_ALICE@APISCONFIG::V1.1x") ) && ( member(other.Packages,"VO_ALICE@jemalloc::v3.6.0") ) && ( member(other.GridPartitions,"ultrapower") ) && ( other.TTL > 43200 ) && ( other.Price <= 20 );
+OrigRequirements = member(other.GridPartitions,"ultrapower");
+TTL = 43200;
+Price = 20.0;
+MemorySize = "8GB";
+WorkDirectorySize = {
+"10000MB"
+};
+LPMParentPID = "1039592301";
+LPMChainID = "46079";
+LPMJobTypeID = "13038";
+JDLVariables = {
+"Packages",
+"OutputDir",
+"TriggerAlias",
+"LPMPass",
+"LPMMetaData",
+"LPMPassName",
+"LPMParentPID",
+"LPMRunNumber",
+"LPMProductionType",
+"LPMRAWPassID",
+"LPMRawPass",
+"RunQuality",
+"LPMCPassMode",
+"LPMInteractionType",
+"LPMProductionTag",
+"LPMAnchorRun",
+"LPMAnchorProduction",
+"LPMAnchorYear",
+"LPMJobTypeID"
+};
+TriggerAlias = "?Trigger=kCalibBarrelMB";
+LPMPass = "0";
+LPMMetaData = "Packages=[VO_ALICE@AliDPG::v5-09-XX-28, VO_ALICE@AliPhysics::v5-09-18-01-1, VO_ALICE@APISCONFIG::V1.1x, VO_ALICE@jemalloc::v3.6.0];OutputDir=/alice/data/2017/LHC17r/000282704/cpass0_pass1/#alienfilename/.root//#;TriggerAlias=?Trigger=kCalibBarrelMB;LPMPass=0;LPMPassName=cpass0_pass1;LPMParentPID=1039592301;LPMRunNumber=282704;LPMProductionType=RAW;LPMRAWPassID=0;LPMRawPass=1;RunQuality=4194303;LPMCPassMode=0;LPMInteractionType=pp;LPMProductionTag=LHC17r;LPMAnchorRun=282704;LPMAnchorProduction=LHC17r;LPMAnchorYear=2017;LPMJobTypeID=13038";
+LPMPassName = "cpass0_pass1";
+LPMRunNumber = "282858";
+LPMProductionType = "RAW";
+LPMRAWPassID = "0";
+LPMRawPass = "1";
+RunQuality = "4194303";
+LPMCPassMode = "0";
+LPMInteractionType = "pp";
+LPMProductionTag = "LHC17r";
+LPMAnchorRun = "282704";
+LPMAnchorProduction = "LHC17r";
+LPMAnchorYear = "2017";
+LegoResubmitZombies = "1";
+ProxyTTL = "1";
+LPMMaxResubmissions = "0";
+Activity = "REC";
+PWG = "COMMON";
+InputDataType = "RAW";
+Type = "Job";
+
+COMMENT = "The rest of the file (apart from the SplitArguments number of evts) was not changed";
+InputFile_override = { "eos-proxy", "local_environment.sh" };
+Comment_Split_override = "production:1-1";
+Comment_SplitArguments_append = " --ocdb $OCDB_PATH --seed $MC_SEED";
+Comment_SplitArguments_replace = { "--nevents\\s[0-9]+", "--nevents 1" };
+SplitArguments_override = "root://eospublic.cern.ch//eos/experiment/alice/release-validation/reference/2016/LHC16e/000252858/#alienfilename# $EVENTS_PER_JOB $(( 10#$(echo #alienfilename# | cut -b3-11) )) raw://";
+X509_USER_PROXY = "$PWD/eos-proxy";
+ALIROOT_FORCE_COREDUMP = "1";
+Output_append = { "core*" };
+ExtraVariables = { "X509_USER_PROXY", "OCDB_PATH", "EVENTS_PER_JOB", "ALIROOT_FORCE_COREDUMP" };
+CONFIG_OCDB = "cvmfs";
+OCDB_PATH = "/cvmfs/alice-ocdb.cern.ch";
+EVENTS_PER_JOB = "1";
+Comment_MC_SEED = "1%04i";
+Comment_ExtraVariables = { "X509_USER_PROXY", "CONFIG_OCDB", "OCDB_PATH", "MC_SEED" };
+Comment_OutputDir_override = "root://eospublic.cern.ch//eos/experiment/alice/release-validation/output/gpmc001/#alien_counter_04i#";
+OutputDir_override = "/tmp/relval/reco/alice/data/2017/LHC17r/000282704/cpass0_pass1/#alienfilename/.root//#";
+#EnvironmentCommand = "source local_environment.sh";
+InputDataCollection_override = "input_files.txt";
+Comment_NoLiveOutput = 1;
+DontArchive = 1;
