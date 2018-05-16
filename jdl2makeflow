@@ -225,6 +225,9 @@ for CORE in core*; do
   echo "$CORE: core dumped"
 done > validation_report.txt 2> /dev/null
 
+# Make some files available to Makeflow directly too
+[[ $ALIEN_JDL_TRANSFERTOMAKEFLOW ]] && cp -v $ALIEN_JDL_TRANSFERTOMAKEFLOW $(dirname $DONEFILE)/
+
 # Compress output according to the output list
 mkdir to_transfer
 shopt -s extglob
@@ -545,11 +548,12 @@ elif jdl["JobType"] == "Reco":
                  "Executable": "aliroot_procVDTime.sh",
                  "Arguments": "tpcSPCalibration.xml %s" % runNumberStr,
                  "targetOCDBDir": "local://./OCDB",  # output for OCDB files, it's "same" (raw://) on the Grid (OCDB is prepopulated from tarball)
-                 "useTOFBC": "false"
+                 "useTOFBC": "false",
+                 "transferToMakeflow": "timeBins.log"
                },
       append={ "InputFile": [ "tpcSPCalibration.xml",
                               os.path.join(os.path.dirname(preprocess_var(jdl["OutputDir"], sh_mode=False)), "OCDB", "OCDB.tar.bz2,unpack") ],
-               "JDLVariables": [ "targetOCDBDir", "useTOFBC" ] },
+               "JDLVariables": [ "targetOCDBDir", "useTOFBC", "transferToMakeflow" ] },
       delete=[ "NextStages", "JobRange", "InputFilesFromList" ])
   xmls["tpcSPCalibration.xml"] = \
     get_alien_xml(
@@ -929,7 +933,7 @@ if args.run:
 {{ "cpass0ResMerge"|job_cmd }}
 
 # cpass0SpBins
-{{ "cpass0SpBins"|job_head }} cpass0Merge.done cpass0ResMerge.done
+timeBins.log {{ "cpass0SpBins"|job_head }} cpass0Merge.done cpass0ResMerge.done
 {{ "cpass0SpBins"|job_cmd }}
 
 {% endif %}
