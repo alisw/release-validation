@@ -263,29 +263,19 @@ node("$RUN_ARCH-relval") {
         [[ -e $JDL ]] || { echo "Cannot find a JDL"; exit 1; }
         cp -v /secrets/eos-proxy .  # fetch EOS proxy in workdir
 
-        if grep -q 'aliroot_dpgsim.sh' "$JDL"; then
-          # JDL belongs to a Monte Carlo
-          OUTPUT_URL="${OUTPUT_URL}/MC"
-          [[ $LIMIT_FILES -ge 1 && $LIMIT_EVENTS -ge 1 ]] || { echo "LIMIT_FILES and LIMIT_EVENTS are wrongly set"; exit 1; }
-          echo "NoLiveOutput = 1;" >> $JDL
-          echo "Split_override = \\"production:1-${LIMIT_FILES}\\";" >> $JDL
-          echo "SplitArguments_replace = { \\"--nevents\\\\\\s[0-9]+\\", \\"--nevents ${LIMIT_EVENTS}\\" };" >> $JDL
-          echo "OutputDir_override = \\"${OUTPUT_XRD}/${RELVAL_NAME}/MC/#alien_counter_04i#\\";" >> $JDL
-          echo "EnvironmentCommand = \\"export PACKAGES=\\\\\\"$ALIENV_PKGS\\\\\\"; export CVMFS_NAMESPACE=\\\\\\"$CVMFS_NAMESPACE\\\\\\"; source custom_environment.sh; type aliroot\\";" >> $JDL
-        else
-          # Other JDL: not supported at the moment
-          echo "This JDL does not belong to a Monte Carlo. Not supported."
-          exit 1
-        fi
+        # Preprocess JDL
+        preprocess_jdl $JDL || true
+
         if [[ $DRYRUN == true ]]; then
           RUN_DRYRUN="--dryrun"
           DONTMENTION=true
         fi
+
         # Start the Release Validation (notify on JIRA before and after)
         jira_relval_started  "$JIRA_ISSUE" "$OUTPUT_URL" "${TAGS// /, }" "$DONTMENTION" || true
         RV=0
         jdl2makeflow ${RUN_DRYRUN} --force --run $JDL -T wq -N alirelval_${RELVAL_NAME} -r 3 -C wqcatalog.marathon.mesos:9097 || RV=$?
-        jira_relval_finished "$JIRA_ISSUE" $RV "$OUTPUT_URL" "${TAGS// /, }" $DONTMENTION || true
+        jira_relval_finished "$JIRA_ISSUE" $RV "$OUTPUT_URL" "${TAGS// /, }" "$DONTMENTION" || true
         exit $RV
       '''
     }
