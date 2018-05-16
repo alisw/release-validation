@@ -672,77 +672,6 @@ for k in dict(all_inputs):
 # Produce the wrapper script for the jobs
 gen_runjob(os.path.join(args.work_dir, "runjob.sh"), jdl, args.dry_run)
 
-# Produce the Makeflow
-makeflow = j2env.from_string("""# Automatically generated
-
-{% for jobindex in range(joba,jobb) -%}
-job{{ "%04d"|format(jobindex) }}.done: runjob.sh {{input_list["Jobs"]|join(" ")}}
-	./runjob.sh {{jobindex}} job{{"%04d"|format(jobindex)}}.done{% if input_files|length > 1 %} {{input_files[jobindex-joba]}}{% endif %}
-{% endfor -%}
-
-{% if "MergeMakeOCDB_CPass0" in next_stages -%}
-mergemakeocdbcpass0.done: runmergemakeocdbcpass0.sh {{input_list["MergeMakeOCDB_CPass0"]|join(" ")}}{% for jobindex in range(joba,jobb) %} job{{"%04d"|format(jobindex)}}.done{% endfor %}
-	./runmergemakeocdbcpass0.sh 0 mergemakeocdbcpass0.done
-{% endif -%}
-
-{% if "MergeFilteredTrees" in next_stages -%}
-mergefilteredtrees.done: runresidualmerge.sh {{input_list["MergeFilteredTrees"]|join(" ")}}{% for jobindex in range(joba,jobb) %} job{{"%04d"|format(jobindex)}}.done{% endfor %}
-	./runresidualmerge.sh 0 mergefilteredtrees.done
-{% endif -%}
-
-{% if "TPCSPVDTime" in next_stages -%}
-tpcspvdtime.done: runtpcspvdtime.sh {{input_list["TPCSPVDTime"]|join(" ")}} mergefilteredtrees.done mergemakeocdbcpass0.done
-	./runtpcspvdtime.sh 0 tpcspvdtime.done
-{% endif -%}
-
-{% if "CPass1" in next_stages -%}
-{% for jobindex in range(joba,jobb) -%}
-cpass1reco{{ "%04d"|format(jobindex) }}.done: runcpass1.sh {{input_list["CPass1"]|join(" ")}} tpcspvdtime.done
-	./runcpass1.sh {{jobindex}} cpass1reco{{"%04d"|format(jobindex)}}.done{% if input_files|length > 1 %} {{input_files[jobindex-joba]}}{% endif %}
-{% endfor -%}
-{% endif -%}
-
-{% if "MergeMakeOCDB_CPass1" in next_stages -%}
-mergemakeocdbcpass1.done: runmergemakeocdbcpass1.sh {{input_list["MergeMakeOCDB_CPass1"]|join(" ")}}{% for jobindex in range(joba,jobb) %} cpass1reco{{"%04d"|format(jobindex)}}.done{% endfor %}
-	./runmergemakeocdbcpass1.sh 0 mergemakeocdbcpass1.done
-{% endif -%}
-
-{% if "MergeFilteredTrees_CPass1" in next_stages -%}
-mergefilteredtreescpass1.done: runcpass1mft.sh {{input_list["MergeFilteredTrees_CPass1"]|join(" ")}}{% for jobindex in range(joba,jobb) %} cpass1reco{{"%04d"|format(jobindex)}}.done{% endfor %}
-	./runcpass1mft.sh 0 mergefilteredtreescpass1.done
-{% endif -%}
-
-{% if "FinalQA" in next_stages -%}
-finalqa.done: runfinalqa.sh {{input_list["FinalQA"]|join(" ")}}{% for jobindex in range(joba,jobb) %} {% if "CPass1" in next_stages -%}cpass1reco{% else %}job{% endif %}{{"%04d"|format(jobindex)}}.done{% endfor %}
-	./runfinalqa.sh 0 finalqa.done
-qaplots.done: runqaplots.sh finalqa.done {{input_list["QAPlots"]|join(" ")}}
-	./runqaplots.sh 0 qaplots.done
-{% endif %}
-""")
-makeflow_fn = os.path.join(args.work_dir, "Makeflow")
-with open(makeflow_fn, "w") as mf:
-  mf.write(makeflow.render(pars        = jdl["SplitArguments"],
-                           input_list  = all_inputs,
-                           joba        = jdl["JobRange"][0],
-                           jobb        = jdl["JobRange"][1]+1,
-                           input_files = jdl["InputFilesFromList"],
-                           next_stages = jdl.get("NextStages", [])))
-if args.graph:
-  wd = os.getcwd()
-  os.chdir(args.work_dir)
-  try:
-    subprocess.check_call("makeflow_viz | dot -T pdf -o Makeflow.pdf", shell=True)
-  except:
-    print("ERROR: cannot generate workflow graph")
-    exit(1)
-  os.chdir(wd)
-
-if not args.run:
-  print("""Execute the workflow with:
-      cd %(workdir)s
-      makeflow %(makeflow_opts)s
-  """ % { "workdir": args.work_dir, "makeflow_opts": " ".join(args.makeflow_opts) })
-
 # Touch placeholder files to skip earlier stages
 if args.start_at in [ "merge", "qaplots", "cpass0merge", "tpcspc", "cpass1", "cpass1merge", "cpass1qa", "cpass1qaplots" ]:
   for jobindex in range(jdl["JobRange"][0], jdl["JobRange"][1]+1):
@@ -763,18 +692,118 @@ if args.start_at in [ "cpass1qa", "cpass1qaplots" ]:
 if args.start_at == "cpass1qaplots":
   open(os.path.join(args.work_dir, "finalqa.done"), "w").close()
 
-# Run Makeflow in dryrun mode to pretend we have completed the earlier stages
-if args.start_at != "sim" and args.start_at != "cpass0":
-  wd = os.getcwd()
-  os.chdir(args.work_dir)
-  devnull = open(os.devnull)
-  subprocess.check_call([ "makeflow", "-T", "dryrun" ], stdout=devnull, stderr=devnull)
-  os.chdir(wd)
-
+# Here we run the Makeflow workflow with additional checks: every Makeflow manifest is generated
+# dynamically at each step
 if args.run:
-  os.chdir(args.work_dir)
-  try:
-    subprocess.check_call([ "time", "makeflow" ] + args.makeflow_opts)
-  except subprocess.CalledProcessError as e:
-    exit(e.returncode if e.returncode > 0 else 128-e.returncode)
+  for step in [ "CPass0", "CPass0_SPC", "CPass1", "PPass" ] if "CPass1" in jdl.get("NextStages", []) else [ "MCPass" ]:
+    print("Generating Makeflow_%s" % step)
+    makeflow = j2env.from_string("""# Makeflow_{{step}} -- automatically generated
+
+{% if step == "MCPass" %}
+# MC: first tier: parallel full MC jobs
+{% for jobindex in range(joba,jobb) -%}
+job{{ "%04d"|format(jobindex) }}.done: runjob.sh {{input_list["Jobs"]|join(" ")}}
+	./runjob.sh {{jobindex}} job{{"%04d"|format(jobindex)}}.done{% if input_files|length > 1 %} {{input_files[jobindex-joba]}}{% endif %}
+{% endfor -%}
+
+# MC: merge filtered trees
+mergefilteredtrees.done: runresidualmerge.sh {{input_list["MergeFilteredTrees"]|join(" ")}}{% for jobindex in range(joba,jobb) %} job{{"%04d"|format(jobindex)}}.done{% endfor %}
+	./runresidualmerge.sh 0 mergefilteredtrees.done
+
+# MC: merge QA results
+finalqa.done: runfinalqa.sh {{input_list["FinalQA"]|join(" ")}}{% for jobindex in range(joba,jobb) %} {% if "CPass1" in next_stages -%}cpass1reco{% else %}job{% endif %}{{"%04d"|format(jobindex)}}.done{% endfor %}
+	./runfinalqa.sh 0 finalqa.done
+
+# MC: create QA plots
+qaplots.done: runqaplots.sh finalqa.done {{input_list["QAPlots"]|join(" ")}}
+	./runqaplots.sh 0 qaplots.done
+{% endif %}
+
+
+{% if step == "CPass0" %}
+# CPass0: first tier: parallel CPass0 reconstruction jobs
+{% for jobindex in range(joba,jobb) -%}
+job{{ "%04d"|format(jobindex) }}.done: runjob.sh {{input_list["Jobs"]|join(" ")}}
+	./runjob.sh {{jobindex}} job{{"%04d"|format(jobindex)}}.done{% if input_files|length > 1 %} {{input_files[jobindex-joba]}}{% endif %}
+{% endfor -%}
+
+# CPass0: merge calibration objects and upload OCDB
+mergemakeocdbcpass0.done: runmergemakeocdbcpass0.sh {{input_list["MergeMakeOCDB_CPass0"]|join(" ")}}{% for jobindex in range(joba,jobb) %} job{{"%04d"|format(jobindex)}}.done{% endfor %}
+	./runmergemakeocdbcpass0.sh 0 mergemakeocdbcpass0.done
+
+# CPass0: merge filtered trees
+mergefilteredtrees.done: runresidualmerge.sh {{input_list["MergeFilteredTrees"]|join(" ")}}{% for jobindex in range(joba,jobb) %} job{{"%04d"|format(jobindex)}}.done{% endfor %}
+	./runresidualmerge.sh 0 mergefilteredtrees.done
+
+# CPass0: SPC: determine time bins
+tpcspvdtime.done: runtpcspvdtime.sh {{input_list["TPCSPVDTime"]|join(" ")}} mergefilteredtrees.done mergemakeocdbcpass0.done
+	./runtpcspvdtime.sh 0 tpcspvdtime.done
+{% endif %}
+
+
+{% if step == "CPass1" %}
+# CPass1: second tier: parallel CPass1 reconstruction jobs
+{% for jobindex in range(joba,jobb) -%}
+cpass1reco{{ "%04d"|format(jobindex) }}.done: runcpass1.sh {{input_list["CPass1"]|join(" ")}} tpcspvdtime.done
+	./runcpass1.sh {{jobindex}} cpass1reco{{"%04d"|format(jobindex)}}.done{% if input_files|length > 1 %} {{input_files[jobindex-joba]}}{% endif %}
+{% endfor -%}
+
+# CPass1: merge calibration objects and upload OCDB
+mergemakeocdbcpass1.done: runmergemakeocdbcpass1.sh {{input_list["MergeMakeOCDB_CPass1"]|join(" ")}}{% for jobindex in range(joba,jobb) %} cpass1reco{{"%04d"|format(jobindex)}}.done{% endfor %}
+	./runmergemakeocdbcpass1.sh 0 mergemakeocdbcpass1.done
+
+# CPass1: merge filtered trees
+mergefilteredtreescpass1.done: runcpass1mft.sh {{input_list["MergeFilteredTrees_CPass1"]|join(" ")}}{% for jobindex in range(joba,jobb) %} cpass1reco{{"%04d"|format(jobindex)}}.done{% endfor %}
+	./runcpass1mft.sh 0 mergefilteredtreescpass1.done
+
+# CPass1: merge QA results
+finalqa.done: runfinalqa.sh {{input_list["FinalQA"]|join(" ")}}{% for jobindex in range(joba,jobb) %} {% if "CPass1" in next_stages -%}cpass1reco{% else %}job{% endif %}{{"%04d"|format(jobindex)}}.done{% endfor %}
+	./runfinalqa.sh 0 finalqa.done
+
+# CPass1: create QA plots
+qaplots.done: runqaplots.sh finalqa.done {{input_list["QAPlots"]|join(" ")}}
+	./runqaplots.sh 0 qaplots.done
+{% endif %}
+""")
+    with open(os.path.join(args.work_dir, "Makeflow_"+step), "w") as mf:
+      mf.write(makeflow.render(pars        = jdl["SplitArguments"],
+                               input_list  = all_inputs,
+                               joba        = jdl["JobRange"][0],
+                               jobb        = jdl["JobRange"][1]+1,
+                               input_files = jdl["InputFilesFromList"],
+                               next_stages = jdl.get("NextStages", []),
+                               step        = step))
+
+    if args.graph:
+      print("Generating graph for step %s" % step)
+      wd = os.getcwd()
+      os.chdir(args.work_dir)
+      try:
+        subprocess.check_call("makeflow_viz Makeflow_%s | dot -T pdf -o Makeflow_%s.pdf" % (step, step),
+                              shell=True)
+      except:
+        print("WARNING: cannot generate workflow graph for %s" % step)
+      os.chdir(wd)
+
+    # Run Makeflow in dryrun mode to pretend we have completed the earlier stages
+    if args.start_at != "sim" and args.start_at != "cpass0":
+      print("Dry-running Makeflow on step %s" % step)
+      wd = os.getcwd()
+      os.chdir(args.work_dir)
+      devnull = open(os.devnull)
+      subprocess.check_call([ "makeflow", "-T", "dryrun", "Makeflow_"+step ],
+                            stdout=devnull, stderr=devnull)
+      os.chdir(wd)
+
+    print("Executing step %s" % step)
+    wd = os.getcwd()
+    os.chdir(args.work_dir)
+    try:
+      subprocess.check_call([ "time", "makeflow", "Makeflow_"+step ] + args.makeflow_opts)
+    except subprocess.CalledProcessError as e:
+      rv = e.returncode if e.returncode > 0 else 128-e.returncode
+      print("Step %s finished with an error: %d" % (step, rv))
+      exit(rv)
+    os.chdir(wd)
+    print("Step %s finished successfully" % step)
   exit(0)
