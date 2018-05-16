@@ -306,7 +306,7 @@ def get_preprocessed_jdl(jdl_fn, override={}, append={}, delete=[]):
       jdl["NextStages"] = [ "MergeMakeOCDB_CPass0", "MergeFilteredTrees",
                             "TPCSPVDTime",
                             "CPass1",
-                            "MergeMakeOCDB_CPass1",
+                            "MergeMakeOCDB_CPass1", "MergeFilteredTrees_CPass1",
                             "FinalQA" ]
 
   # Job environment
@@ -481,6 +481,30 @@ if "MergeFilteredTrees" in jdl.get("NextStages", []):
                           jdl["JobRange"][0], jdl["JobRange"][1], jdl["InputFilesFromList"])
   all_inputs["MergeFilteredTrees"] = jdl_mft["InputFile"]
 
+# Reco CPass1: merging of filtered trees
+jdl_reco_cpass1mft = {}
+if "MergeFilteredTrees_CPass1" in jdl.get("NextStages", []):
+  filtered_trees_fn = "FilterEvents_Trees.root"
+  jdl_reco_cpass1mft = get_preprocessed_jdl(args.jdl,
+              override={ "Output": [ "spcm_archive.zip:pyxsec*.root,AODQA.root,AliAOD*.root,FilterEvents_Trees*.root,*.stat*,EventStat_temp*.root,Residual*.root,TOFcalibTree.root,std*,fileinfo*.log@disk=2",
+                                     "validation_report.txt",
+                                     "core*" ],
+                         "OutputDir": os.path.join(os.path.dirname(preprocess_var(jdl_reco_cpass1["OutputDir"], sh_mode=False)),
+                                                   "MergedTrees",
+                                                   "001"),
+                         "Executable": "merge.sh",
+                         "InputXML": "residualtrees_cpass1.xml",
+                         "LPMCollectionEntity": filtered_trees_fn,
+                         "NoGridConnect": "1",
+                         "SplitArguments": "" },
+              append={ "InputFile": [ "residualtrees_cpass1.xml" ],
+                       "JDLVariables": [ "LPMCollectionEntity", "InputXML", "NoGridConnect" ] },
+              delete=[ "NextStages", "JobRange", "InputFilesFromList" ])
+  xml_cpass1mft = get_alien_xml(os.path.join(jdl_reco_cpass1["OutputDir"], filtered_trees_fn),
+                                jdl_reco_cpass1["JobRange"][0], jdl_reco_cpass1["JobRange"][1],
+                                jdl_reco_cpass1["InputFilesFromList"])
+  all_inputs["MergeFilteredTrees_CPass1"] = jdl_reco_cpass1mft["InputFile"]
+
 # Second tier of jobs: FinalQA
 jdl_fqa = {}
 if "FinalQA" in jdl.get("NextStages", []):
@@ -538,6 +562,9 @@ if args.parse or args.parse_only:
   if jdl_reco_mergemakeocdbcpass1:
     print("\n# Reco CPass1: merge and make OCDB")
     print(json.dumps(jdl_reco_mergemakeocdbcpass1, indent=2))
+  if jdl_reco_cpass1mft:
+    print("\n# Reco CPass1: merging of filtered trees")
+    print(json.dumps(jdl_reco_cpass1mft, indent=2))
   if jdl_fqa:
     print("\n# Final QA")
     print(json.dumps(jdl_fqa, indent=2))
@@ -616,6 +643,9 @@ if jdl_reco_cpass1:
 if jdl_reco_mergemakeocdbcpass1:
   with open(os.path.join(args.work_dir, "calibobjects_cpass1.xml"), "w") as f: f.write(xml_calib_cpass1)
   gen_runjob(os.path.join(args.work_dir, "runmergemakeocdbcpass1.sh"), jdl_reco_mergemakeocdbcpass1, args.dry_run)
+if jdl_reco_cpass1mft:
+  with open(os.path.join(args.work_dir, "residualtrees_cpass1.xml"), "w") as f: f.write(xml_cpass1mft)
+  gen_runjob(os.path.join(args.work_dir, "runcpass1mft.sh"), jdl_reco_cpass1mft, args.dry_run)
 if jdl_fqa:
   with open(os.path.join(args.work_dir, inputfile_fqa), "w") as f: f.write(inputlist_fqa)
   gen_runjob(os.path.join(args.work_dir, "runfinalqa.sh"), jdl_fqa, args.dry_run)
@@ -675,6 +705,11 @@ cpass1reco{{ "%04d"|format(jobindex) }}.done: runcpass1.sh {{input_list["CPass1"
 {% if "MergeMakeOCDB_CPass1" in next_stages -%}
 mergemakeocdbcpass1.done: runmergemakeocdbcpass1.sh {{input_list["MergeMakeOCDB_CPass1"]|join(" ")}}{% for jobindex in range(joba,jobb) %} cpass1reco{{"%04d"|format(jobindex)}}.done{% endfor %}
 	./runmergemakeocdbcpass1.sh 0 mergemakeocdbcpass1.done
+{% endif -%}
+
+{% if "MergeFilteredTrees_CPass1" in next_stages -%}
+mergefilteredtreescpass1.done: runcpass1mft.sh {{input_list["MergeFilteredTrees_CPass1"]|join(" ")}}{% for jobindex in range(joba,jobb) %} cpass1reco{{"%04d"|format(jobindex)}}.done{% endfor %}
+	./runcpass1mft.sh 0 mergefilteredtreescpass1.done
 {% endif -%}
 
 {% if "FinalQA" in next_stages -%}
