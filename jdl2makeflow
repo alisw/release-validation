@@ -27,7 +27,8 @@ stages_reco = [
                 # CPass1
                 [ "cpass1" ],
                 [ "cpass1Merge", "cpass1ResMerge" ],
-                [ "cpass1QaMerge" ]
+                [ "cpass1QaMerge" ],
+                [ "cpass1QaPlots" ]
               ]
 stages_flat = [ y for x in stages_mc+stages_reco for y in x  ]
 
@@ -405,7 +406,7 @@ if jdl["JobType"] == "MC":
 elif jdl["JobType"] == "Reco":
   all_inputs["cpass0"] = jdl["InputFile"]
   stages = stages_reco
-  steps = [ "CPass0", "CPass0_SPC" ]  # [ "CPass1", "PPass" ]
+  steps = [ "CPass0", "CPass0_SPC", "CPass1" ]  # "PPass"
 else:
   print("Cannot recognize job type, only MC and Reco are supported")
   exit(1)
@@ -494,6 +495,10 @@ elif jdl["JobType"] == "Reco":
   # Run number in integer and string formats
   runNumberStr = os.path.basename(jdl["InputFilesFromList"][0])[2:11]
   runNumber = int(runNumberStr)
+
+  #
+  # CPass0
+  #
 
   # cpass0
   jdls["cpass0"] = jdl
@@ -594,120 +599,119 @@ elif jdl["JobType"] == "Reco":
                "JDLVariables": [ "targetOCDBDir", "CreateOCDBArchive" ] },
       delete=[ "JobRange", "InputFilesFromList" ])
 
+  #
+  # CPass1
+  #
+
+  # cpass1
+  jdls["cpass1"] = \
+    get_preprocessed_jdl(args.jdl,
+      override={ "Output": [ "log_archive.zip:qa*.log,calib.log,filtering.log,mergeQA_outer.log,mergeQA_barrel.log,rec.log,stderr.log,stdout.log@disk=1",
+                             "root_archive.zip:AliESDs_Barrel.root,CalibObjects.root,*.ESD.tag.root,TOFcalibTree.root,T0AnalysisTree.root@disk=2",
+                             "QA_archive.zip:QAresults_barrel.root,QAresults_outer.root,*.stat.qa*@disk=2",
+                             "EventStat_temp*.root@disk=2",
+                             "ResidualTrees.root@disk=2",
+                             "FilterEvents_Trees.root@disk=2",
+                             "validation_report.txt",
+                             "core*" ],
+                 "OutputDir": jdl["OutputDir"].replace("/cpass0_pass1/", "/cpass1_pass1/"),
+                 "Executable": "aliroot_dpgCPass1.sh",
+                 "LPMPass": "1",
+                 "LPMPassName": "cpass1_pass1",
+                 "LPMRAWPassID": "1",
+                 "LPMCPassMode": "1"
+               },
+      append={ "InputFile": [ os.path.join(os.path.dirname(preprocess_var(jdl["OutputDir"], sh_mode=False)),
+                                           "ResidualMerge", "TPCSPCalibration", "CorrectionMaps", "OCDB_SPC.tar.bz2,unpack") ] },
+      delete=[])
+
+  # cpass1Merge
+  jdls["cpass1Merge"] = \
+    get_preprocessed_jdl(args.jdl,
+      override={ "Output": [ "log_archive.zip:*.log@disk=2",
+                             "ocdb_archive.zip:CalibObjects.root,meanITSVertex.root,fitITSVertex.root,cpassStat.root@disk=4",
+                             "OCDB.tar.bz2",
+                             "validation_report.txt",
+                             "core*" ],
+                 "OutputDir": os.path.join(os.path.dirname(preprocess_var(jdls["cpass1"]["OutputDir"], sh_mode=False)), "OCDB"),
+                 "Executable": "aliroot_dpgMergeMakeOCDB_CPass1.sh",
+                 "Arguments": "calibobjects_cpass1.xml %d local://./OCDB fileAccessMethod=copyXMLcollection makeOCDB=1 calibObjectsFileName=CalibObjects.root" % runNumber,
+                 "CreateOCDBArchive": "OCDB.tar.bz2"
+               },
+      append={ "InputFile": [ os.path.join(os.path.dirname(preprocess_var(jdl["OutputDir"], sh_mode=False)),
+                                           "ResidualMerge", "TPCSPCalibration", "CorrectionMaps", "OCDB_SPC.tar.bz2,unpack"),
+                              "calibobjects_cpass1.xml" ],
+               "JDLVariables": [ "CreateOCDBArchive" ] },
+      delete=[ "JobRange", "InputFilesFromList" ])
+  xmls["calibobjects_cpass1.xml"] = \
+    get_alien_xml(os.path.join(jdls["cpass1"]["OutputDir"], "CalibObjects.root"),
+                  jdls["cpass1"]["JobRange"][0], jdls["cpass1"]["JobRange"][1],
+                  jdls["cpass1"]["InputFilesFromList"])
+
+  # cpass1ResMerge
+  jdls["cpass1ResMerge"] = \
+    get_preprocessed_jdl(args.jdl,
+              override={ "Output": [ "spcm_archive.zip:pyxsec*.root,AODQA.root,AliAOD*.root,FilterEvents_Trees*.root,*.stat*,EventStat_temp*.root,Residual*.root,TOFcalibTree.root,std*,fileinfo*.log@disk=2",
+                                     "validation_report.txt",
+                                     "core*" ],
+                         "OutputDir": os.path.join(os.path.dirname(preprocess_var(jdls["cpass1"]["OutputDir"], sh_mode=False)),
+                                                   "MergedTrees", "001"),
+                         "Executable": "merge.sh",
+                         "InputXML": "eventtrees_cpass1.xml",
+                         "LPMCollectionEntity": "FilterEvents_Trees.root,TOFcalibTree.root",
+                         "NoGridConnect": "1",
+                         "SplitArguments": "" },
+              append={ "InputFile": [ "eventtrees_cpass1.xml" ],
+                       "JDLVariables": [ "LPMCollectionEntity", "InputXML", "NoGridConnect" ] },
+              delete=[ "JobRange", "InputFilesFromList" ])
+  xmls["eventtrees_cpass1.xml"] = \
+    get_alien_xml(os.path.join(jdls["cpass1"]["OutputDir"], "ResidualTrees.root"),
+                               jdls["cpass1"]["JobRange"][0], jdls["cpass1"]["JobRange"][1],
+                               jdls["cpass1"]["InputFilesFromList"])
+
+  # cpass1QaMerge
+  inputfile = "finalqa.txt" if jdls["cpass1"]["DontArchive"] or jdls["cpass1"]["SaveAll"] else "finalqa.xml"
+  jdls["cpass1QaMerge"] = \
+    get_preprocessed_jdl(args.jdl,
+      override={ "Output": [ "QA_merge_log_archive.zip:std*,fileinfo*.log@disk=1",
+                             "QA_merge_archive.zip:*QAresults*.root,EventStat_temp*.root,trending*.root,event_stat*.root,*.stat*@disk=3",
+                             "validation_report.txt",
+                             "core*" ],
+                 "OutputDir": os.path.dirname(preprocess_var(jdls["cpass1"]["OutputDir"], sh_mode=False)),
+                 "Executable": "train_merge.sh",
+                 "SplitArguments": "%s 5" % inputfile },  # 5 means "final stage"
+      append={ "InputFile": [ inputfile ] },
+      delete=[ "JobRange" ])
+  if inputfile.endswith(".xml"):
+    xmls[inputfile] = \
+      get_alien_xml(os.path.join(jdls["cpass1"]["OutputDir"], "QA_archive.zip"),
+                                 jdls["cpass1"]["JobRange"][0], jdls["cpass1"]["JobRange"][1],
+                                 jdls["cpass1"]["InputFilesFromList"])
+  else:
+    pattern = preprocess_var(jdls["cpass1"]["OutputDir"], sh_mode=False)
+    txts[inputfile] = "\n".join([ j2env.from_string(pattern).render(alien_counter=ji, input_files=jdls["cpass1"]["InputFilesFromList"])
+                                  for ji in range(jdls["cpass1"]["JobRange"][0], jdls["cpass1"]["JobRange"][1]+1) ]) + "\n"
+    del pattern
+  del inputfile
+
+  # cpass1QaPlots
+  inputs = [ "QAresults.root", "QAresults_merged.root", "QAresults_barrel.root",
+             "QAresults_outer.root", "FilterEvents_Trees.root", "event_stat.root",
+             "event_stat_barrel.root", "event_stat_outer.root" ] \
+           if jdls["cpass1"]["DontArchive"] or jdls["cpass1"]["SaveAll"] else \
+           [ "QA_merge_archive.zip" ]
+  jdls["cpass1QaPlots"] = \
+    get_preprocessed_jdl(args.jdl,
+      override={ "Output": [ "qa_plots/*", "std*", "core*", "validation_report.txt" ],
+                 "OutputDir": os.path.join(os.path.dirname(preprocess_var(jdls["cpass1"]["OutputDir"], sh_mode=False)), "QAplots_CPass1"),
+                 "Executable": "qa_plots.sh",
+                 "SplitArguments": " ".join([ os.path.join(os.path.dirname(preprocess_var(jdls["cpass1"]["OutputDir"], sh_mode=False)), x) for x in inputs ]) },
+      append={ "InputFile": [ "qa_plots.sh" ] },
+      delete=[ "JobRange", "InputFilesFromList" ])
+  del inputs
+
 else:
   assert False, "should not happen: jdl[\"JobType\"] should be handled at this point"
-
-## Reco CPass1
-#jdl_reco_cpass1 = {}
-#if "CPass1" in jdl.get("NextStages", []):
-#  jdl_reco_cpass1 = \
-#    get_preprocessed_jdl(args.jdl,
-#      override={ "Output": [ "log_archive.zip:qa*.log,calib.log,filtering.log,mergeQA_outer.log,mergeQA_barrel.log,rec.log,stderr.log,stdout.log@disk=1",
-#                             "root_archive.zip:AliESDs_Barrel.root,CalibObjects.root,*.ESD.tag.root,TOFcalibTree.root,T0AnalysisTree.root@disk=2",
-#                             "QA_archive.zip:QAresults_barrel.root,QAresults_outer.root,*.stat.qa*@disk=2",
-#                             "EventStat_temp*.root@disk=2",
-#                             "ResidualTrees.root@disk=2",
-#                             "FilterEvents_Trees.root@disk=2",
-#                             "validation_report.txt",
-#                             "core*" ],
-#                 "OutputDir": jdl["OutputDir"].replace("/cpass0_pass1/", "/cpass1_pass1/"),
-#                 "Executable": "aliroot_dpgCPass1.sh",
-#                 "LPMPass": "1",
-#                 "LPMPassName": "cpass1_pass1",
-#                 "LPMRAWPassID": "1",
-#                 "LPMCPassMode": "1"
-#               },
-#      append={ "InputFile"   : [ os.path.join(os.path.dirname(preprocess_var(jdl["OutputDir"], sh_mode=False)), "OCDB", "OCDB.tar.bz2,unpack") ] },
-#      delete=[ "NextStages" ])
-#  all_inputs["CPass1"] = jdl_reco_cpass1["InputFile"]
-#
-## Reco CPass1: merge and make OCDB
-#jdl_reco_mergemakeocdbcpass1 = {}
-#if "MergeMakeOCDB_CPass1" in jdl.get("NextStages", []):
-#  runNumber = int(os.path.basename(jdl["InputFilesFromList"][0])[2:11])
-#  jdl_reco_mergemakeocdbcpass1 = \
-#    get_preprocessed_jdl(args.jdl,
-#      override={ "Output": [ "log_archive.zip:*.log@disk=2",
-#                             "ocdb_archive.zip:CalibObjects.root,meanITSVertex.root,fitITSVertex.root,cpassStat.root@disk=4",
-#                             "OCDB.tar.bz2",
-#                             "validation_report.txt",
-#                             "core*" ],
-#                 "OutputDir": os.path.join(os.path.dirname(preprocess_var(jdl_reco_cpass1["OutputDir"], sh_mode=False)), "OCDB"),
-#                 "Executable": "aliroot_dpgMergeMakeOCDB_CPass1.sh",
-#                 "Arguments": "calibobjects_cpass1.xml %d local://./OCDB fileAccessMethod=copyXMLcollection makeOCDB=1 calibObjectsFileName=CalibObjects.root" % runNumber,
-#                 "CreateOCDBArchive": "1"
-#               },
-#      append={ "InputFile"   : [ "calibobjects_cpass1.xml",
-#                                 os.path.join(os.path.dirname(preprocess_var(jdl["OutputDir"], sh_mode=False)), "OCDB", "OCDB.tar.bz2,unpack") ],
-#               "JDLVariables": [ "CreateOCDBArchive" ] },
-#      delete=[ "NextStages", "JobRange", "InputFilesFromList" ])
-#  all_inputs["MergeMakeOCDB_CPass1"] = jdl_reco_mergemakeocdbcpass1["InputFile"]
-#  xml_calib_cpass1 = get_alien_xml(os.path.join(jdl_reco_cpass1["OutputDir"], "CalibObjects.root"),
-#                                   jdl_reco_cpass1["JobRange"][0], jdl_reco_cpass1["JobRange"][1],
-#                                   jdl_reco_cpass1["InputFilesFromList"])
-#
-## Reco CPass1: merging of filtered trees
-#jdl_reco_cpass1mft = {}
-#if "MergeFilteredTrees_CPass1" in jdl.get("NextStages", []):
-#  filtered_trees_fn = "FilterEvents_Trees.root"
-#  jdl_reco_cpass1mft = get_preprocessed_jdl(args.jdl,
-#              override={ "Output": [ "spcm_archive.zip:pyxsec*.root,AODQA.root,AliAOD*.root,FilterEvents_Trees*.root,*.stat*,EventStat_temp*.root,Residual*.root,TOFcalibTree.root,std*,fileinfo*.log@disk=2",
-#                                     "validation_report.txt",
-#                                     "core*" ],
-#                         "OutputDir": os.path.join(os.path.dirname(preprocess_var(jdl_reco_cpass1["OutputDir"], sh_mode=False)),
-#                                                   "MergedTrees",
-#                                                   "001"),
-#                         "Executable": "merge.sh",
-#                         "InputXML": "residualtrees_cpass1.xml",
-#                         "LPMCollectionEntity": filtered_trees_fn,
-#                         "NoGridConnect": "1",
-#                         "SplitArguments": "" },
-#              append={ "InputFile": [ "residualtrees_cpass1.xml" ],
-#                       "JDLVariables": [ "LPMCollectionEntity", "InputXML", "NoGridConnect" ] },
-#              delete=[ "NextStages", "JobRange", "InputFilesFromList" ])
-#  xml_cpass1mft = get_alien_xml(os.path.join(jdl_reco_cpass1["OutputDir"], filtered_trees_fn),
-#                                jdl_reco_cpass1["JobRange"][0], jdl_reco_cpass1["JobRange"][1],
-#                                jdl_reco_cpass1["InputFilesFromList"])
-#  all_inputs["MergeFilteredTrees_CPass1"] = jdl_reco_cpass1mft["InputFile"]
-#
-## Second tier of jobs: FinalQA
-#jdl_fqa = {}
-#if "FinalQA" in jdl.get("NextStages", []):
-#  isMC = not "CPass1" in jdl.get("NextStages", [])
-#  jdl_base = jdl if isMC else jdl_reco_cpass1  # do it for CPass1 on reconstruction
-#  inputfile_fqa = "finalqa.txt" if jdl["DontArchive"] or jdl["SaveAll"] else "finalqa.xml"
-#  jdl_fqa = get_preprocessed_jdl(args.jdl,
-#              override={ "Output": [ "QA_merge_log_archive.zip:std*,fileinfo*.log@disk=1",
-#                                     "QA_merge_archive.zip:*QAresults*.root,EventStat_temp*.root,trending*.root,event_stat*.root,*.stat*@disk=3",
-#                                     "validation_report.txt",
-#                                     "core*" ],
-#                         "OutputDir": os.path.dirname(preprocess_var(jdl_base["OutputDir"], sh_mode=False)),
-#                         "Executable": "aliprod_train_merge.sh" if isMC else "train_merge.sh",
-#                         "SplitArguments": "%s 5" % inputfile_fqa},  # 5 means "final stage"
-#              append={ "InputFile": [ inputfile_fqa ] + ([ "aliprod_train_merge.sh" ] if isMC else []) },
-#              delete=[ "NextStages", "JobRange" ])
-#  if inputfile_fqa.endswith(".xml"):
-#    inputlist_fqa = get_alien_xml(os.path.join(jdl_base["OutputDir"], "QA_archive.zip"),
-#                                  jdl_base["JobRange"][0], jdl_base["JobRange"][1],
-#                                  jdl_base["InputFilesFromList"])
-#  else:
-#    pattern = preprocess_var(jdl_base["OutputDir"], sh_mode=False)
-#    inputlist_fqa = "\n".join([ j2env.from_string(pattern).render(alien_counter=ji, input_files=jdl_base["InputFilesFromList"])
-#                                for ji in range(jdl_base["JobRange"][0], jdl_base["JobRange"][1]+1) ]) + "\n"
-#  all_inputs["FinalQA"] = jdl_fqa["InputFile"]
-#  qap_inputs = [ "QAresults.root", "QAresults_merged.root", "QAresults_barrel.root",
-#                 "QAresults_outer.root", "FilterEvents_Trees.root", "event_stat.root",
-#                 "event_stat_barrel.root", "event_stat_outer.root" ] \
-#                if jdl["DontArchive"] or jdl["SaveAll"] else \
-#               [ "QA_merge_archive.zip" ]
-#  jdl_qap = get_preprocessed_jdl(args.jdl,
-#              override={ "Output": [ "qa_plots/*", "std*", "core*", "validation_report.txt" ],
-#                         "OutputDir": os.path.join(os.path.dirname(preprocess_var(jdl_base["OutputDir"], sh_mode=False)), "QAplots_passMC" if isMC else "QAPlots_CPass1"),
-#                         "Executable": "qa_plots.sh",
-#                         "SplitArguments": " ".join([ os.path.join(preprocess_var(os.path.dirname(jdl_base["OutputDir"]), sh_mode=False), x) for x in qap_inputs ]) },
-#              append={ "InputFile": [ "qa_plots.sh" ] },
-#              delete=[ "NextStages", "JobRange", "InputFilesFromList" ])
-#  all_inputs["QAPlots"] = jdl_qap["InputFile"]
 
 if args.parse or args.parse_only:
   for j in jdls:
@@ -871,32 +875,6 @@ if args.run:
           open(os.path.join(args.work_dir, "cpass0SpDistMaps%04d.done" % i), "w").close()
 
     print("Generating Makeflow_%s" % step)
-
-#{% if step == "CPass1" %}
-## CPass1: second tier: parallel CPass1 reconstruction jobs
-#{% for jobindex in range(joba,jobb) -%}
-#cpass1reco{{ "%04d"|format(jobindex) }}.done: runcpass1.sh {{input_list["CPass1"]|join(" ")}} tpcspvdtime.done
-#	./runcpass1.sh {{jobindex}} cpass1reco{{"%04d"|format(jobindex)}}.done{% if input_files|length > 1 %} {{input_files[jobindex-joba]}}{% endif %}
-#{% endfor -%}
-#
-## CPass1: merge calibration objects and upload OCDB
-#mergemakeocdbcpass1.done: runmergemakeocdbcpass1.sh {{input_list["MergeMakeOCDB_CPass1"]|join(" ")}}{% for jobindex in range(joba,jobb) %} cpass1reco{{"%04d"|format(jobindex)}}.done{% endfor %}
-#	./runmergemakeocdbcpass1.sh 0 mergemakeocdbcpass1.done
-#
-## CPass1: merge filtered trees
-#mergefilteredtreescpass1.done: runcpass1mft.sh {{input_list["MergeFilteredTrees_CPass1"]|join(" ")}}{% for jobindex in range(joba,jobb) %} cpass1reco{{"%04d"|format(jobindex)}}.done{% endfor %}
-#	./runcpass1mft.sh 0 mergefilteredtreescpass1.done
-#
-## CPass1: merge QA results
-#finalqa.done: runfinalqa.sh {{input_list["FinalQA"]|join(" ")}}{% for jobindex in range(joba,jobb) %} {% if "CPass1" in next_stages -%}cpass1reco{% else %}job{% endif %}{{"%04d"|format(jobindex)}}.done{% endfor %}
-#	./runfinalqa.sh 0 finalqa.done
-#
-## CPass1: create QA plots
-#qaplots.done: runqaplots.sh finalqa.done {{input_list["QAPlots"]|join(" ")}}
-#	./runqaplots.sh 0 qaplots.done
-#{% endif %}
-#""")
-
     makeflow = j2env.from_string("""
 # Makeflow_{{step}} -- automatically generated
 
@@ -950,6 +928,30 @@ timeBins.log {{ "cpass0SpBins"|job_head }} cpass0Merge.done cpass0ResMerge.done
 # cpass0SpCalib
 {{ "cpass0SpCalib"|job_head }}{% for j in range(0,jdls["cpass0SpDistMaps"]["timeBins"]|length) %}{{ " cpass0SpDistMaps%04d.done"|format(j) }}{% endfor %}
 {{ "cpass0SpCalib"|job_cmd }}
+{% endif %}
+
+{% if step == "CPass1" %}
+# cpass1
+{% for jobindex in range(joba,jobb) -%}
+{{ "cpass1"|job_head(index=jobindex) }} cpass0SpCalib.done
+{{ "cpass1"|job_cmd(index=jobindex) }}
+{% endfor %}
+
+# cpass1Merge
+{{ "cpass1Merge"|job_head }}{% for j in range(joba,jobb) %}{{ " cpass1%04d.done"|format(j) }}{% endfor %}
+{{ "cpass1Merge"|job_cmd }}
+
+# cpass1ResMerge
+{{ "cpass1ResMerge"|job_head }}{% for j in range(joba,jobb) %}{{ " cpass1%04d.done"|format(j) }}{% endfor %}
+{{ "cpass1ResMerge"|job_cmd }}
+
+# cpass1QaMerge
+{{ "cpass1QaMerge"|job_head }} cpass1Merge.done
+{{ "cpass1QaMerge"|job_cmd }}
+
+# cpass1QaPlots
+{{ "cpass1QaPlots"|job_head }} cpass1QaMerge.done
+{{ "cpass1QaPlots"|job_cmd }}
 {% endif %}
 """)
     with open(os.path.join(args.work_dir, "Makeflow_"+step), "w") as mf:

@@ -6,12 +6,22 @@ export runNumber=${ALIEN_JDL_LPMANCHORRUN:=$ALIEN_JDL_LPMRUNNUMBER}
 DET_INCL=$ALIEN_JDL_QADETECTORINCLUDE
 DET_EXCL=$ALIEN_JDL_QADETECTOREXCLUDE
 
-# Form the output path suffix: <year>/<period>/passMC/<run>
+# Guess our pass from output directory
+for U in ${ALIEN_JDL_OUTPUTDIR//\// }; do
+  if [[ $U == QAplots_* ]]; then
+    PASS_NAME=${U//QAplots_}
+    PASS_NAME=$(echo $PASS_NAME | tr '[:upper:]' '[:lower:]')
+    break
+  fi
+done
+[[ $PASS_NAME ]] || { echo "Cannot compute PASS_NAME, aborting"; exit 1; }
+
+# Form the output path suffix: <year>/<period>/<pass_name>/<run>
 # <run> is the run number, not the anchor one
 if [[ $ALIEN_JDL_LPMPRODUCTIONTAG =~ ^LHC([0-9]{2}) ]]; then
   YEAR=${BASH_REMATCH[1]}
   [[ $YEAR < 90 ]] && YEAR=20$YEAR || YEAR=19$YEAR
-  PASS_DIR=$(printf "%d/%s/passMC/%09d" $YEAR $ALIEN_JDL_LPMPRODUCTIONTAG $ALIEN_JDL_LPMRUNNUMBER)
+  PASS_DIR=$(printf "%d/%s/%s/%09d" "$YEAR" "$ALIEN_JDL_LPMPRODUCTIONTAG" "$PASS_NAME" "$ALIEN_JDL_LPMRUNNUMBER")
   unset YEAR
 else
   echo "Invalid value for ALIEN_JDL_LPMPRODUCTIONTAG: $ALIEN_JDL_LPMPRODUCTIONTAG, aborting"
