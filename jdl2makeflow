@@ -838,9 +838,13 @@ for j in jdls:
 # location will not be copied
 for f in set([ i for j in jdls for k in jdls[j] for i in jdls[j].get("InputFile", []) ]):
   dest = os.path.join(args.work_dir, f)
-  if os.path.isfile(dest) or re.search("^(/|[^ :]+:)", f):
-    continue  # do not copy this file (remote location)
+  if f in xmls or f in txts or re.search("^(/|[^ :]+:)", f):
+    continue  # do not copy this file (was generated, or from a remote location)
   print("Copying %s to the work directory" % f)
+  try:
+    os.remove(dest)
+  except:
+    pass
   try:
     copy2(f, dest)  # try from current dir first
   except:
