@@ -107,6 +107,7 @@ JOBDIR=$(basename "$0")
 JOBDIR=job-${JOBDIR%.*}-$(printf %04d $JOBID)
 DONEFILE="$PWD/$2"
 INPUTFILE="$3"
+shift 3 || shift 2 || true
 
 function alienfmt() {
   local ALIENFMT_STR="$1"
@@ -211,8 +212,8 @@ type "$PROG" &> /dev/null || PROG="$(find "$ALIDPG_ROOT" -name "{{executable|bas
 [[ -x "$PROG" ]] || PROG="bash $PROG"
 MAINERR=0
 { env; echo + $PROG $ARGS; } >> stdout.log
-$PROG $ARGS  > >(tee -a stdout.log{% if no_live_out %} &> /dev/null{% endif %}) \\
-            2> >(tee -a stderr.log{% if no_live_out %} &> /dev/null{% endif %}) || MAINERR=$?
+$PROG $ARGS $*  > >(tee -a stdout.log{% if no_live_out %} &> /dev/null{% endif %}) \\
+               2> >(tee -a stderr.log{% if no_live_out %} &> /dev/null{% endif %}) || MAINERR=$?
 {% endif -%}
 [[ $MAINERR != 0 ]] && echo "Exited with errors ($MAINERR)" || echo "Exited with no errors";
 { echo + $PROG $ARGS "exited with $MAINERR"; } >> stdout.log
