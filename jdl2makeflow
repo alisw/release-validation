@@ -343,6 +343,15 @@ def get_preprocessed_jdl(jdl_fn, override={}, append={}, delete=[]):
     jdl["InputFilesFromList"] = [ x.strip() for x in
                                   open(os.path.basename(jdl.get("InputDataCollection", ""))).readlines()
                                   if not re.search("(^\s*#|^\s*$)", x) ]
+    try:
+      trunc = int(jdl.get["LimitInputFiles"])
+    except:
+      trunc = 0
+    if trunc > 0:
+      jdl["InputFilesFromList"] = jdl["InputFilesFromList"][:trunc]
+      jdl["LimitInputFiles"] = trunc
+    else:
+      del jdl["LimitInputFiles"]
   except Exception as e:
     jdl["InputFilesFromList"] = []
 

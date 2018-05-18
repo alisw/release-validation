@@ -162,6 +162,9 @@ ignored by AliEn.
 * `NoLiveOutput`: set it to `1` to save output on files only, without seeing
   what happens while it does. This is useful if we want to prevent Makeflow from
   showing confusing output from all running jobs on the same terminal.
+* `InputFilesFromList`: text file with the list of input chunks, one per line.
+* `LimitInputFiles`: limit the number of input files read from the list
+  specified in `InputFilesFromList`.
 
 
 Overriding JDL variables
