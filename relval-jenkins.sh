@@ -151,54 +151,66 @@ function jira_relval_finished() {
    return 0
 }
 
-# Function to preprocess the JDL
+# Function to preprocess the JDL with Jenkins parameters. Also sets global
+# JOB_TYPE variable.
 # Usage:
 #   preprocess_jdl $JDL_IN $JDL_OUT
 function preprocess_jdl() {
   local JDL_IN=$1
   local JDL_OUT=$2
+  [[ $REC_LIMIT_FILES -ge 1 && $REC_LIMIT_EVENTS -ge 1 ]] || { echo "REC_LIMIT_FILES and REC_LIMIT_EVENTS are wrongly set"; return 1; }
   if grep -q 'aliroot_dpgsim.sh' "$JDL_IN"; then
-    echo "Parsing JDL: ${JDL_IN}..."
     # JDL belongs to a Monte Carlo
-    OUTPUT_URL="${OUTPUT_URL}/MC"
-    [[ $LIMIT_FILES -ge 1 && $LIMIT_EVENTS -ge 1 ]] || { echo "LIMIT_FILES and LIMIT_EVENTS are wrongly set"; return 1; }
+    JOB_TYPE=sim
     cat <<EoF >> "$JDL_OUT"
+InputFile_append = { "eos-proxy", "cvmfs_environment.sh" };
+Split_override = "production:1-${SIM_NUM_JOBS}";
+SplitArguments_append = " --ocdb \$OCDB_PATH --seed \$MC_SEED";
+SplitArguments_replace = { "--nevents\\s[0-9]+", "--nevents \${SIM_EVENTS_PER_JOB}" };
+X509_USER_PROXY = "$PWD/eos-proxy";
+CONFIG_OCDB = "cvmfs";
+OCDB_PATH = "/cvmfs/alice-ocdb.cern.ch";
+MC_SEED = "1#alien_counter_04i#";
+ExtraVariables = { "X509_USER_PROXY", "CONFIG_OCDB", "OCDB_PATH", "MC_SEED" };
+OutputDir_override = "${OUTPUT_XRD}/${RELVAL_NAME}/${JOB_TYPE}/#alien_counter_04i#";
+EnvironmentCommand = "export PACKAGES=\"$ALIENV_PKGS\"; export CVMFS_NAMESPACE=\"$CVMFS_NAMESPACE\"; source cvmfs_environment.sh; type aliroot";
 NoLiveOutput = 1;
-Split_override = "production:1-${LIMIT_FILES}";
-SplitArguments_replace = { "--nevents\\s[0-9]+", "--nevents \${LIMIT_EVENTS}" };
-OutputDir_override = "${OUTPUT_XRD}/${RELVAL_NAME}/MC/#alien_counter_04i#";
-EnvironmentCommand = "export PACKAGES=\"$ALIENV_PKGS\"; export CVMFS_NAMESPACE=\"$CVMFS_NAMESPACE\"; source custom_environment.sh; type aliroot";
+DontArchive = 1;
 EoF
   elif grep -q '/aliroot_dpg' "$JDL_IN"; then
     # JDL belongs to a Reconstruction
-    LHC_PERIOD=$(head -n1 input_files.txt | grep -oE '/LHC[0-9]{2}[^/]/')
-    LHC_PERIOD=${LHC_PERIOD//\/}
-    RUN_NUMBER=$(head -n1 input_files.txt | grep -oE '/[0-9]{9}/')
-    RUN_NUMBER=$(( 10#${RUN_NUMBER//\/} ))
+    JOB_TYPE=rec
+    local LHC_PERIOD=$(head -n1 input_files.txt | grep -oE '/LHC[0-9]{2}[^/]/')
+    local LHC_PERIOD=${LHC_PERIOD//\/}
+    local RUN_NUMBER=$(head -n1 input_files.txt | grep -oE '/[0-9]{9}/')
+    local RUN_NUMBER=$(( 10#${RUN_NUMBER//\/} ))
+    rm -f input_files.txt
+    ln -nfs ../../datasets/$DATASET.txt input_files.txt
+    ls -l input_files.txt
     cat <<EoF >> "$JDL_OUT"
 X509_USER_PROXY = "\$PWD/eos-proxy";
 OCDB_PATH = "/cvmfs/alice-ocdb.cern.ch";
-EVENTS_PER_JOB = "$LIMIT_EVENTS";
+EVENTS_PER_JOB = "$REC_LIMIT_EVENTS";
 ALIROOT_FORCE_COREDUMP = "1";
 ExtraVariables = { "X509_USER_PROXY", "OCDB_PATH", "EVENTS_PER_JOB", "ALIROOT_FORCE_COREDUMP" };
-InputFile_override = { "eos-proxy", "local_environment.sh" };
+InputFile_override = { "eos-proxy", "cvmfs_environment.sh" };
 Output_append = { "core*", "validation_report.txt" };
-OutputDir_override = "${OUTPUT_XRD}/${RELVAL_NAME}/reco/#alien_counter_04i#";
-EnvironmentCommand = "source local_environment.sh";
+OutputDir_override = "${OUTPUT_XRD}/${RELVAL_NAME}/${JOB_TYPE}/#alien_counter_04i#";
+EnvironmentCommand = "export PACKAGES=\"$ALIENV_PKGS\"; export CVMFS_NAMESPACE=\"$CVMFS_NAMESPACE\"; source cvmfs_environment.sh; type aliroot";
 InputDataCollection_override = "input_files.txt";
 Packages = { $(for P in $ALIENV_PKGS; do echo \"$P\",; done)"" };
-SplitArguments_override = "$(basename $(head -n1 input_files.txt))/#alienfilename# \$EVENTS_PER_JOB \$(( 10#\$(echo #alienfilename# | cut -b3-11) )) raw://";
+SplitArguments_override = "$(dirname $(head -n1 input_files.txt))/#alienfilename# \$EVENTS_PER_JOB \$(( 10#\$(echo #alienfilename# | cut -b3-11) )) raw://";
 NoLiveOutput = 0;
 DontArchive = 1;
 LPMRunNumber = "$RUN_NUMBER";
 LPMAnchorRun = "$RUN_NUMBER";
 LPMProductionTag = "$LHC_PERIOD";
 LPMAnchorProduction = "$LHC_PERIOD";
-LimitInputFiles = "$LIMIT_FILES";
+LimitInputFiles = "$REC_LIMIT_FILES";
 EoF
   else
-    # Other JDL: not supported at the moment
-    echo "This JDL does not belong to a Monte Carlo. Not supported."
+    # Assert we are only using JDLs known to work
+    echo "This JDL does not represent a recognized workflow, aborting!"
     return 1
   fi
   return 0

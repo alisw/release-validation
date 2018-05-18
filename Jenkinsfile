@@ -168,37 +168,24 @@ node("$RUN_ARCH-relval") {
     '''
   }
 
-  stage "Checking framework"
-  if ("$SKIP_CHECK_FRAMEWORK" == "true") {
-    println("Skipping as per user request")
-  }
-  else {
-    sh '''
-      set -e
-      set -o pipefail
-      curl -X DELETE -H "Content-type: application/json" "http://leader.mesos:8080/v2/apps/wqmesos/tasks?scale=true"
-      curl -X DELETE -H "Content-type: application/json" "http://leader.mesos:8080/v2/apps/wqcatalog/tasks?scale=true"
-      curl -X PUT -H "Content-type: application/json" --data '{ "instances": 1 }' "http://leader.mesos:8080/v2/apps/wqcatalog?force=true"
-      sleep 90
-      curl -X PUT -H "Content-type: application/json" --data '{ "instances": 1 }' "http://leader.mesos:8080/v2/apps/wqmesos?force=true"
-    '''
-  }
-
   stage "Validating"
-  withEnv(["LIMIT_FILES=$LIMIT_FILES",
-           "LIMIT_EVENTS=$LIMIT_EVENTS",
+  withEnv(["REC_LIMIT_FILES=$REC_LIMIT_FILES",
+           "REC_LIMIT_EVENTS=$REC_LIMIT_EVENTS",
+           "SIM_NUM_JOBS=$SIM_NUM_JOBS",
+           "SIM_EVENTS_PER_JOB=$SIM_EVENTS_PER_JOB",
            "CVMFS_NAMESPACE=$CVMFS_NAMESPACE",
            "DATASET=$DATASET",
-           "DRYRUN=$DRYRUN",
-           "PARSEONLY=$PARSEONLY",
-           "DONTMENTION=$DONTMENTION",
-           "MONKEYPATCH_TARBALL_URL=$MONKEYPATCH_TARBALL_URL",
+           "DRY_RUN=$DRY_RUN",
+           "PARSE_ONLY=$PARSE_ONLY",
+           "DONT_MENTION=$DONT_MENTION",
            "REQUIRED_SPACE_GB=$REQUIRED_SPACE_GB",
            "REQUIRED_FILES=$REQUIRED_FILES",
            "JIRA_ISSUE=$JIRA_ISSUE",
            "JDL_TO_RUN=$JDL_TO_RUN",
            "RELVAL_TIMESTAMP=$RELVAL_TIMESTAMP",
-           "TAGS=$TAGS"]) {
+           "RELVAL=$RELVAL",
+           "TAGS=$TAGS",
+           "SKIP_CHECK_FRAMEWORK=$SKIP_CHECK_FRAMEWORK"]) {
     withCredentials([[$class: 'UsernamePasswordMultiBinding',
                       credentialsId: '369b09bf-5f5e-4b68-832a-2f30cad28755',
                       usernameVariable: 'JIRA_USER',
@@ -239,7 +226,7 @@ node("$RUN_ARCH-relval") {
         RELVAL_REPO="${RELVAL%:*}"
         [[ $RELVAL_BRANCH == $RELVAL ]] && RELVAL_BRANCH= || true
         rm -rf release-validation/
-        git clone "https://github.com/$RELVAL_REPO" ${RELVAL_BRANCH:+-b "$RELVAL_BRANCH"} release-validation/
+        git clone --depth 1 "https://github.com/$RELVAL_REPO" ${RELVAL_BRANCH:+-b "$RELVAL_BRANCH"} release-validation/
         export PYTHONUSERBASE=$PWD/python
         export PATH=$PYTHONUSERBASE/bin:$PATH
         rm -rf python && mkdir python
@@ -261,28 +248,41 @@ node("$RUN_ARCH-relval") {
         # Add overrides to the JDL
         for THIS_JDL in $(echo "${JDL_TO_RUN//,/ }"); do
 
-          if [[ $DRYRUN == true ]]; then
-            RUN_DRYRUN="--dryrun"
-            DONTMENTION=true
+          if [[ $DRY_RUN == true ]]; then
+            DRY_RUN_SWITCH="--dryrun"
+            DONT_MENTION=true
           fi
-          if [[ $PARSEONLY == true ]]; then
-            PARSEONLY="--parse-only"
+          if [[ $PARSE_ONLY == true ]]; then
+            PARSE_ONLY_SWITCH="--parse-only"
             JIRA_ISSUE=
           fi
 
-          pushd release-validation/examples/$THIS_JDL
+          pushd release-validation/examples/$THIS_JDL &> /dev/null
+            echo ""
             echo "=== Starting release validation for $THIS_JDL ==="
             [[ -e "${THIS_JDL}.jdl" ]] || { echo "Cannot find ${THIS_JDL}.jdl"; exit 1; }
+
+            if [[ $SKIP_CHECK_FRAMEWORK != true ]]; then
+              curl -X DELETE -H "Content-type: application/json" "http://leader.mesos:8080/v2/apps/wqmesos/tasks?scale=true"
+              curl -X DELETE -H "Content-type: application/json" "http://leader.mesos:8080/v2/apps/wqcatalog/tasks?scale=true"
+              curl -X PUT -H "Content-type: application/json" --data '{ "instances": 1 }' "http://leader.mesos:8080/v2/apps/wqcatalog?force=true"
+              sleep 90
+              curl -X PUT -H "Content-type: application/json" --data '{ "instances": 1 }' "http://leader.mesos:8080/v2/apps/wqmesos?force=true"
+            fi
+
             cp -v /secrets/eos-proxy .  # fetch EOS proxy in workdir
             preprocess_jdl "${THIS_JDL}.jdl" "${THIS_JDL}_override.jdl"
+            echo "Job type was determined to be: ${JOB_TYPE}"
 
             # Start the Release Validation (notify on JIRA before and after)
-            jira_relval_started  "$JIRA_ISSUE" "$OUTPUT_URL" "${TAGS// /, }" "$DONTMENTION" || true
+            jira_relval_started  "$JIRA_ISSUE" "$OUTPUT_URL/$JOB_TYPE" "${TAGS// /, }" "$DONT_MENTION" || true
             RV=0
-            jdl2makeflow ${PARSEONLY} ${RUN_DRYRUN} --force --run "${THIS_JDL}.jdl" -T wq -N alirelval_${RELVAL_NAME} -r 3 -C wqcatalog.marathon.mesos:9097 || RV=$?
-            jira_relval_finished "$JIRA_ISSUE" $RV "$OUTPUT_URL" "${TAGS// /, }" "$DONTMENTION" || true
+            set -x
+            jdl2makeflow ${PARSE_ONLY_SWITCH} ${DRY_RUN_SWITCH} --remove --run "${THIS_JDL}.jdl" -T wq -N alirelval_${RELVAL_NAME} -r 3 -C wqcatalog.marathon.mesos:9097 || RV=$?
+            set +x
+            jira_relval_finished "$JIRA_ISSUE" $RV "$OUTPUT_URL/$JOB_TYPE" "${TAGS// /, }" "$DONT_MENTION" || true
             [[ $RV == 0 ]] || exit $RV
-          popd
+          popd &> /dev/null
 
         done
         exit 0

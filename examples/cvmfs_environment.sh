@@ -1,7 +1,7 @@
 #!/bin/bash -e
 
 # Use this script with jdl2makeflow by adding the following line to your JDL:
-# EnvironmentCommand = "export PACKAGES=\"<package1> <package2>\"; export CVMFS_NAMESPACE=alice-nightlies; source custom_environment.sh";
+# EnvironmentCommand = "export PACKAGES=\"<package1> <package2>\"; export CVMFS_NAMESPACE=alice-nightlies; source cvmfs_environment.sh";
 
 SW_COUNT=0
 SW_MAXCOUNT=200
