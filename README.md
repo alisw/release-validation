@@ -159,9 +159,9 @@ ignored by AliEn.
 * `NoLiveOutput`: set it to `1` to save output on files only, without seeing
   what happens while it does. This is useful if we want to prevent Makeflow from
   showing confusing output from all running jobs on the same terminal.
-* `InputFilesFromList`: text file with the list of input chunks, one per line.
+* `InputDataCollection`: text file with the list of input chunks, one per line.
 * `LimitInputFiles`: limit the number of input files read from the list
-  specified in `InputFilesFromList`.
+  specified in `InputDataCollection`.
 * `CopyTimeout`: timeout, in seconds for transferring output files to the remote
   storage. Defaults to 100 seconds. Must be added to `JDLVariables` too.
 * `CopyNumJobs`: copy of output files happens in parallel: this variable

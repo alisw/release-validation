@@ -18,3 +18,4 @@ LPMRunNumber = "252858";
 LPMAnchorRun = "252858";
 LPMProductionTag = "LHC17r";
 LPMAnchorProduction = "LHC17r";
+LimitInputFiles = "4";
