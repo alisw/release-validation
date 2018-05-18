@@ -263,11 +263,22 @@ node("$RUN_ARCH-relval") {
             [[ -e "${THIS_JDL}.jdl" ]] || { echo "Cannot find ${THIS_JDL}.jdl"; exit 1; }
 
             if [[ $SKIP_CHECK_FRAMEWORK != true ]]; then
-              curl -X DELETE -H "Content-type: application/json" "http://leader.mesos:8080/v2/apps/wqmesos/tasks?scale=true"
-              curl -X DELETE -H "Content-type: application/json" "http://leader.mesos:8080/v2/apps/wqcatalog/tasks?scale=true"
-              curl -X PUT -H "Content-type: application/json" --data '{ "instances": 1 }' "http://leader.mesos:8080/v2/apps/wqcatalog?force=true"
-              sleep 90
-              curl -X PUT -H "Content-type: application/json" --data '{ "instances": 1 }' "http://leader.mesos:8080/v2/apps/wqmesos?force=true"
+              TIME0=$(date --utc +%s)
+              CURLOPTS="--max-time 10 -s -f -o /dev/null"
+              echo "Stopping framework..."
+              curl $CURLOPTS -X DELETE "http://leader.mesos:8080/v2/apps/wqmesos/tasks?scale=true" || true
+              echo "Stopping catalog..."
+              curl $CURLOPTS -X DELETE "http://leader.mesos:8080/v2/apps/wqcatalog/tasks?scale=true" || true
+              echo "Starting catalog..."
+              curl $CURLOPTS -X PUT -H "Content-type: application/json" --data '{ "instances": 1 }' "http://leader.mesos:8080/v2/apps/wqcatalog?force=true"
+              echo "Waiting for catalog deployment..."
+              for ((I=0; I<90; I++)); do
+                curl $CURLOPTS "http://wqcatalog.marathon.mesos:9097" || { sleep 1; continue; }
+                break
+              done
+              echo "Starting framework..."
+              curl $CURLOPTS -X PUT -H "Content-type: application/json" --data '{ "instances": 1 }' "http://leader.mesos:8080/v2/apps/wqmesos?force=true"
+              echo "Framework restart took $(( $(date --utc +%s)-TIME0 )) seconds"
             fi
 
             cp -v /secrets/eos-proxy .  # fetch EOS proxy in workdir
