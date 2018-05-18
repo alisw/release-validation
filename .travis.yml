@@ -15,7 +15,7 @@ script: |
       pushd $DIR/
         echo ">> Testing JDL under $DIR"
         echo "dummy eos-proxy" > eos-proxy
-        coverage run ../../jdl2makeflow *.jdl
+        coverage run ../../jdl2makeflow $DIR.jdl
         coverage xml
         COV_REPORTS="$COV_REPORTS $PWD/coverage.xml"
       popd
