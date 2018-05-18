@@ -14,11 +14,11 @@ Requirements
 your system. Makeflow is part of the Cooperative Computing tools (cctools). To
 install it, [download the latest
 version of cctools](http://ccl.cse.nd.edu/software/downloadfiles.php) then
-unpack, compile and install it (we are assuming 6.1.1 is the latest, check the
+unpack, compile and install it (we are assuming 6.2.9 is the latest, check the
 download page first):
 
     cd /tmp
-    curl -L http://ccl.cse.nd.edu/software/files/cctools-6.1.1-source.tar.gz | tar xzf -
+    curl -L http://ccl.cse.nd.edu/software/files/cctools-6.2.9-source.tar.gz | tar xzf -
     cd cctools-*-source/
     ./configure && make -j10
     sudo make install
@@ -28,7 +28,7 @@ Adjust `-j10` to the number of parallel cores you want to use during the build.
 If you do not have root privileges:
 
     cd /tmp
-    curl -L http://ccl.cse.nd.edu/software/files/cctools-6.1.1-source.tar.gz | tar xzf -
+    curl -L http://ccl.cse.nd.edu/software/files/cctools-6.2.9-source.tar.gz | tar xzf -
     cd cctools-*-source/
     ./configure --prefix=$HOME/cctools && make -j10 && make install
     echo 'export PATH=$HOME/cctools/bin:$PATH' >> ~/.bashrc
@@ -44,12 +44,11 @@ Get jdl2makeflow
 
 As easy as:
 
-    sudo pip install alien-jdl2makeflow
+    pip install git+https://github.com/alisw/release-validation
 
-If you cannot install it as root, you will probably have to export some Python
-variables to make it work. If you have a user installation of some Python
-distribution like [Anaconda](https://www.continuum.io/downloads) this is
-probably already done for you.
+Make sure proper `PATH`, `PYTHONUSERBASE`, etc. user variables are set. If you
+are using [Virtualenv](https://virtualenv.pypa.io/) or
+[Anaconda](https://www.continuum.io/downloads) this is already done for you.
 
 
 Basic usage
@@ -66,11 +65,9 @@ Run:
     jdl2makeflow /path/to/job.jdl
 
 By default, it will print a summary and create all necessary files under a
-working directory called `work` (override with `-w`). You then need to move to
-the working directory and run:
-
-    cd work
-    makeflow
+working directory called `work` (override with `-w`). Nothing will run, in order
+to do that you need to add the `--run` switch after `jdl2makeflow`: our program
+will handle all the subsequent calls to `makeflow` automatically.
 
 
 Relevant JDL variables
@@ -86,7 +83,7 @@ in a different way.
     2. basename (must be in `$PATH`)
     3. `$ALIDPG_ROOT/bin`
     4. current working directory
-* `SplitArguments`: arguments to pass to the executable.
+* `SplitArguments` or `Arguments`: arguments to pass to the executable.
 * `InputFile`: list of files that need to be made available in the job's working
   directory for the job to run. Only the basename of the file will be considered
   and it will be searched for in the current directory. No AliEn access will be
@@ -165,6 +162,11 @@ ignored by AliEn.
 * `InputFilesFromList`: text file with the list of input chunks, one per line.
 * `LimitInputFiles`: limit the number of input files read from the list
   specified in `InputFilesFromList`.
+* `CopyTimeout`: timeout, in seconds for transferring output files to the remote
+  storage. Defaults to 100 seconds. Must be added to `JDLVariables` too.
+* `CopyNumJobs`: copy of output files happens in parallel: this variable
+  alters the number of parallel copy jobs, which defaults to 15. Must be added
+  to `JDLVariables` too.
 
 
 Overriding JDL variables
