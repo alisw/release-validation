@@ -1,0 +1,1 @@
+../cvmfs_environment.sh
