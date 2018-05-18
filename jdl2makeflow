@@ -35,8 +35,6 @@ stages_flat = [ y for x in stages_mc+stages_reco for y in x  ]
 ap = ArgumentParser()
 ap.add_argument("--dryrun", "-n", dest="dry_run", default=None, action="store_true",
                 help="Generate Makeflow scripts that do not actually run any job")
-ap.add_argument("--makeflow-only", "-g", dest="makeflow_only", default=None, action="store_true",
-                help="Generate Makeflow scripts only, do not run")
 ap.add_argument("--workdir", "-w", dest="work_dir", default="work",
                 help="Makeflow work directory (defaults to \"work\")")
 ap.add_argument("--parse", dest="parse", default=False, action="store_true",
@@ -877,44 +875,45 @@ if args.start_at:
       break
 
 # Run the workflow with additional checks: every Makeflow manifest is generated at each step
-if args.run:
-  for step in steps:
+for step in steps:
 
-    # Special instructions for certain steps: may affect Makeflow creation
-    if step == "CPass0_SPC":
-      print("CPass0_SPC: parsing time bins")
-      tbf = os.path.join(args.work_dir, "timeBins.log")
-      if not os.path.isfile(tbf) and args.makeflow_only:
-        print("CPass0_SPC: WARNING: could not find timeBins.log, creating a dummy one!")
-        with open(tbf, "w") as fp:
-          fp.write("0 0 0\n")
-      with open(tbf) as fp:
-        jdls["cpass0SpDistMaps"]["timeBins"] = [ x for x in fp.read().split("\n") if re.search("^[0-9]+ [0-9]+ [0-9]+$", x) ]
-      if not jdls["cpass0SpDistMaps"]["timeBins"]:
-        print("ERROR: CPass0 SP time bins creation returned no valid lines, check timeBins.log")
-        exit(2)
-      del tbf
+  # Special instructions for certain steps: may affect Makeflow creation
+  tbf = os.path.join(args.work_dir, "timeBins.log")
+  if step == "CPass0":
+    if os.path.isfile(tbf) and args.run:
+      os.remove(tbf)
+  elif step == "CPass0_SPC":
+    print("CPass0_SPC: parsing time bins")
+    if not os.path.isfile(tbf) and not args.run:
+      print("CPass0_SPC: WARNING: could not find timeBins.log, creating a dummy one!")
+      with open(tbf, "w") as fp:
+        fp.write("0 0 0\n")
+    with open(tbf) as fp:
+      jdls["cpass0SpDistMaps"]["timeBins"] = [ x for x in fp.read().split("\n") if re.search("^[0-9]+ [0-9]+ [0-9]+$", x) ]
+    if not jdls["cpass0SpDistMaps"]["timeBins"]:
+      print("ERROR: CPass0 SP time bins creation returned no valid lines, check timeBins.log")
+      exit(2)
 
-      # Those are not real input files, but they are passed as "input file" parameter of each job in
-      # order to make it possible to parse #alienfilename# in the OutputDir formation
-      jdls["cpass0SpDistMaps"]["InputFilesFromList"] = [ x.replace(" ", "_") for x in jdls["cpass0SpDistMaps"]["timeBins"] ]
+    # Those are not real input files, but they are passed as "input file" parameter of each job in
+    # order to make it possible to parse #alienfilename# in the OutputDir formation
+    jdls["cpass0SpDistMaps"]["InputFilesFromList"] = [ x.replace(" ", "_") for x in jdls["cpass0SpDistMaps"]["timeBins"] ]
 
-      # Dynamically generate alitpcdcalibres.txt
-      print("CPass0_SPC: generating collection of output files")
-      pattern = preprocess_var(os.path.join(jdls["cpass0SpDistMaps"]["OutputDir"], "alitpcdcalibres.root"), sh_mode=False)
-      with open(os.path.join(args.work_dir, "alitpcdcalibres.txt"), "w") as fp:
-        fp.write( \
-          "\n".join([ j2env.from_string(pattern).render(alien_counter=ji, input_files=jdls["cpass0SpDistMaps"]["InputFilesFromList"])
-                      for ji in range(0, len(jdls["cpass0SpDistMaps"]["InputFilesFromList"])) ]) + "\n" )
+    # Dynamically generate alitpcdcalibres.txt
+    print("CPass0_SPC: generating collection of output files")
+    pattern = preprocess_var(os.path.join(jdls["cpass0SpDistMaps"]["OutputDir"], "alitpcdcalibres.root"), sh_mode=False)
+    with open(os.path.join(args.work_dir, "alitpcdcalibres.txt"), "w") as fp:
+      fp.write( \
+        "\n".join([ j2env.from_string(pattern).render(alien_counter=ji, input_files=jdls["cpass0SpDistMaps"]["InputFilesFromList"])
+                    for ji in range(0, len(jdls["cpass0SpDistMaps"]["InputFilesFromList"])) ]) + "\n" )
 
-      # Touch donefiles for cpass0SpDistMaps if appropriate
-      if args.start_at and stages_flat.index(args.start_at) > stages_flat.index("cpass0SpDistMaps"):
-        print("CPass0_SPC: touching done files")
-        for i in range(0, len(jdls["cpass0SpDistMaps"]["timeBins"])):
-          open(os.path.join(args.work_dir, "cpass0SpDistMaps%04d.done" % i), "w").close()
+    # Touch donefiles for cpass0SpDistMaps if appropriate
+    if args.start_at and stages_flat.index(args.start_at) > stages_flat.index("cpass0SpDistMaps"):
+      print("CPass0_SPC: touching done files")
+      for i in range(0, len(jdls["cpass0SpDistMaps"]["timeBins"])):
+        open(os.path.join(args.work_dir, "cpass0SpDistMaps%04d.done" % i), "w").close()
 
-    print("Generating Makeflow_%s" % step)
-    makeflow = j2env.from_string("""
+  print("Generating Makeflow_%s" % step)
+  makeflow = j2env.from_string("""
 # Makeflow_{{step}} -- automatically generated
 
 {% if step == "MCPass" %}
@@ -993,43 +992,43 @@ timeBins.log {{ "cpass0SpBins"|job_head }} cpass0Merge.done cpass0ResMerge.done
 {{ "cpass1QaPlots"|job_cmd }}
 {% endif %}
 """)
-    with open(os.path.join(args.work_dir, "Makeflow_"+step), "w") as mf:
-      mf.write(makeflow.render(jdls=jdls,
-                               step=step,
-                               joba= jdl["JobRange"][0],
-                               jobb= jdl["JobRange"][1]+1))
+  with open(os.path.join(args.work_dir, "Makeflow_"+step), "w") as mf:
+    mf.write(makeflow.render(jdls=jdls,
+                             step=step,
+                             joba= jdl["JobRange"][0],
+                             jobb= jdl["JobRange"][1]+1))
 
-    if args.graph:
-      print("Generating graph for step %s" % step)
-      wd = os.getcwd()
-      os.chdir(args.work_dir)
-      try:
-        subprocess.check_call("makeflow_viz Makeflow_%s | dot -T pdf -o Makeflow_%s.pdf" % (step, step),
-                              shell=True)
-      except:
-        print("WARNING: cannot generate workflow graph for %s" % step)
-      os.chdir(wd)
-
-    # Run Makeflow in dryrun mode to pretend we have completed the earlier stages
-    if args.start_at:
-      print("Dry-running Makeflow on step %s" % step)
-      wd = os.getcwd()
-      os.chdir(args.work_dir)
-      devnull = open(os.devnull)
-      subprocess.check_call([ "makeflow", "-T", "dryrun", "Makeflow_"+step ],
-                            stdout=devnull, stderr=devnull)
-      os.chdir(wd)
-
-    print("Executing step %s" % step)
+  if args.graph:
+    print("Generating graph for step %s" % step)
     wd = os.getcwd()
     os.chdir(args.work_dir)
     try:
-      subprocess.check_call( ["time"] + (["echo", "+"]if args.makeflow_only else []) + \
-                             [ "makeflow", "Makeflow_"+step ] + args.makeflow_opts)
-    except subprocess.CalledProcessError as e:
-      rv = e.returncode if e.returncode > 0 else 128-e.returncode
-      print("Step %s finished with an error: %d" % (step, rv))
-      exit(rv)
+      subprocess.check_call("makeflow_viz Makeflow_%s | dot -T pdf -o Makeflow_%s.pdf" % (step, step),
+                            shell=True)
+    except:
+      print("WARNING: cannot generate workflow graph for %s" % step)
     os.chdir(wd)
-    print("Step %s finished successfully" % step)
-  exit(0)
+
+  # Run Makeflow in dryrun mode to pretend we have completed the earlier stages
+  if args.start_at:
+    print("Dry-running Makeflow on step %s" % step)
+    wd = os.getcwd()
+    os.chdir(args.work_dir)
+    devnull = open(os.devnull)
+    subprocess.check_call([ "makeflow", "-T", "dryrun", "Makeflow_"+step ],
+                          stdout=devnull, stderr=devnull)
+    os.chdir(wd)
+
+  print("Executing step %s" % step)
+  wd = os.getcwd()
+  os.chdir(args.work_dir)
+  try:
+    subprocess.check_call( ["time"] + ([] if args.run else ["echo", "+"]) + \
+                           [ "makeflow", "Makeflow_"+step ] + args.makeflow_opts)
+  except subprocess.CalledProcessError as e:
+    rv = e.returncode if e.returncode > 0 else 128-e.returncode
+    print("Step %s finished with an error: %d" % (step, rv))
+    exit(rv)
+  os.chdir(wd)
+  print("Step %s finished successfully" % step)
+exit(0)
