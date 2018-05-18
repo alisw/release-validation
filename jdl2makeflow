@@ -857,11 +857,17 @@ if args.run:
     # Special instructions for certain steps: may affect Makeflow creation
     if step == "CPass0_SPC":
       print("CPass0_SPC: parsing time bins")
-      with open("timeBins.log") as fp:
+      tbf = os.path.join(args.work_dir, "timeBins.log")
+      if not os.path.isfile(tbf) and args.makeflow_only:
+        print("CPass0_SPC: WARNING: could not find timeBins.log, creating a dummy one!")
+        with open(tbf, "w") as fp:
+          fp.write("0 0 0\n")
+      with open(tbf) as fp:
         jdls["cpass0SpDistMaps"]["timeBins"] = [ x for x in fp.read().split("\n") if re.search("^[0-9]+ [0-9]+ [0-9]+$", x) ]
       if not jdls["cpass0SpDistMaps"]["timeBins"]:
         print("ERROR: CPass0 SP time bins creation returned no valid lines, check timeBins.log")
         exit(2)
+      del tbf
 
       # Those are not real input files, but they are passed as "input file" parameter of each job in
       # order to make it possible to parse #alienfilename# in the OutputDir formation
