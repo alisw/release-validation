@@ -298,7 +298,14 @@ def get_alien_xml(pattern, joba, jobb, input_files):
   return axml.render(joba=joba, jobb=jobb, input_files=input_files)
 
 def get_preprocessed_jdl(jdl_fn, override={}, append={}, delete=[]):
-  jdl = classad.parse(open(jdl_fn).read(), ignore_errors=True)
+  m = re.search("^(.*)(\.[^.]+)$", jdl_fn)
+  jdl_fn_override = "%s_override%s" % (m.group(1),m.group(2)) if m else jdl_fn + "_override"
+  with open(jdl_fn) as fp:
+    jdl_buf = fp.read()
+  if os.path.isfile(jdl_fn_override):
+    with open(jdl_fn_override) as fp:
+      jdl_buf += "\n" + fp.read()
+  jdl = classad.parse(jdl_buf, ignore_errors=True)
 
   # Process overrides
   for k in override:

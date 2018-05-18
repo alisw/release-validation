@@ -1,2 +1,1 @@
-root://eospublic.cern.ch//eos/experiment/alice/release-validation/reference/2016/LHC16e/000252858/16000252858019.13500.root
-root://eospublic.cern.ch//eos/experiment/alice/release-validation/reference/2016/LHC16e/000252858/16000252858019.13900.root
+../../datasets/LHC17f.txt
