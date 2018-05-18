@@ -1,0 +1,14 @@
+InputFile_append = { "eos-proxy", "local_environment.sh" };
+Split_override = "production:1-5";
+SplitArguments_append = " --ocdb $OCDB_PATH --seed $MC_SEED";
+SplitArguments_replace = { "--nevents\\s[0-9]+", "--nevents 1" };
+X509_USER_PROXY = "$PWD/eos-proxy";
+CONFIG_OCDB = "cvmfs";
+OCDB_PATH = "/cvmfs/alice-ocdb.cern.ch";
+MC_SEED = "1#alien_counter_04i#";
+ExtraVariables = { "X509_USER_PROXY", "CONFIG_OCDB", "OCDB_PATH", "MC_SEED" };
+UncommentForEOS_OutputDir_override = "root://eospublic.cern.ch//eos/experiment/alice/release-validation/output/gpmc001/#alien_counter_04i#";
+OutputDir_override = "/tmp/relval/gpmc/#alien_counter_04i#";
+EnvironmentCommand = "source local_envirnment.sh";
+NoLiveOutput = 0;
+DontArchive = 1;
