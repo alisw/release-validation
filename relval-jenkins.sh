@@ -150,3 +150,29 @@ function jira_relval_finished() {
        done)"
    return 0
 }
+
+# Function to preprocess the JDL
+# Usage:
+#   preprocess_jdl $JDL
+function preprocess_jdl() {
+  local JDL_IN=$1
+  local JDL_OUT=$2
+  if grep -q 'aliroot_dpgsim.sh' "$JDL_IN"; then
+    echo "Parsing JDL: ${JDL_IN}..."
+    # JDL belongs to a Monte Carlo
+    OUTPUT_URL="${OUTPUT_URL}/MC"
+    [[ $LIMIT_FILES -ge 1 && $LIMIT_EVENTS -ge 1 ]] || { echo "LIMIT_FILES and LIMIT_EVENTS are wrongly set"; return 1; }
+    cat <<EoF >> "$JDL_OUT"
+NoLiveOutput = 1;
+Split_override = "production:1-${LIMIT_FILES}";
+SplitArguments_replace = { "--nevents\\s[0-9]+", "--nevents \${LIMIT_EVENTS}" };
+OutputDir_override = "${OUTPUT_XRD}/${RELVAL_NAME}/MC/#alien_counter_04i#";
+EnvironmentCommand = "export PACKAGES=\"$ALIENV_PKGS\"; export CVMFS_NAMESPACE=\"$CVMFS_NAMESPACE\"; source custom_environment.sh; type aliroot";
+EoF
+  else
+    # Other JDL: not supported at the moment
+    echo "This JDL does not belong to a Monte Carlo. Not supported."
+    return 1
+  fi
+  return 0
+}

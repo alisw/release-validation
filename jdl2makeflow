@@ -97,7 +97,7 @@ def preprocess_var(s, sh_mode):
 
 def gen_runjob(output_file, jdl, dry_run):
   runjob = j2env.from_string("""#!/bin/bash -e
-type zip unzip zipinfo
+type zip unzip zipinfo timeout readlink
 ulimit -c unlimited  # enable core dumps
 {% for v in [ "LANG", "LANGUAGE", "LC_ALL", "LC_COLLATE", "LC_CTYPE", "LC_MESSAGES", \
               "LC_MONETARY", "LC_NUMERIC", "LC_TIME", "LC_ALL" ] -%}
@@ -142,38 +142,7 @@ INPUT_LIST=({% for x in input_list -%}
 OUTPUT_LIST=({% for x in output_list -%}
              "{{x}}"
              {% endfor %})
-for INP in "${INPUT_LIST[@]}"; do
-  PROTO=${INP%%://*}
-  UNPACK=
-  [[ $PROTO != $INP ]] || { PROTO=local; [[ $INP == /* ]] || INP="../$INP"; }
-  [[ $PROTO == local || $PROTO == root ]] || { echo "Input protocol $PROTO not supported"; exit 1; }
-  [[ $INP == *,unpack ]] && { UNPACK=1; INP=${INP//,unpack}; }
-  for ((I=1; I<=5; I++)); do
-    ERR=0
-    echo "Transferring $INP to the input box (attempt $I/5)"
-    case $PROTO in
-      local) cp -v "$INP" . && break || ERR=$? ;;
-      root)  xrdcp -f "$INP" . && break || ERR=$? ;;
-    esac
-  done
-  [[ $ERR == 0 ]] || { echo "Error copying files into the input box"; exit 1; }
-  if [[ $UNPACK ]]; then
-    INP=${INP##*/}
-    echo "Unpacking then removing $INP"
-    case "$INP" in
-      *.tar.bz2) UNPACK_CMD="tar xjvvf" ;;
-      *.tar.gz)  UNPACK_CMD="tar xzvvf" ;;
-      *.zip)     UNPACK_CMD="unzip"     ;;
-      *) echo "Unsupported archive format: $INP"; exit 1; ;;
-    esac
-    $UNPACK_CMD "$INP" || ERR=$?
-    rm -f "$INP"
-  fi
-  [[ $ERR == 0 ]] || { echo "Error unpacking files into the input box"; exit 1; }
-done
-echo "List of files in the working directory (recursive)"
-find . -ls
-echo "List of files ends here"
+{{""}}
 {% if env_cmd -%}
 # Set custom environment (handling potential concurrency issues on our side)
 LOCKDIR=/tmp/makeflow_env_lock
@@ -198,6 +167,38 @@ eval $(/cvmfs/alice.cern.ch/bin/alienv printenv {{packages|join(",")}})
 export {{x}}="{{environment[x]|replace('"', '\\\\"')}}"
 {% endfor -%}
 {{""}}
+for INP in "${INPUT_LIST[@]}"; do
+  PROTO=${INP%%://*}
+  UNPACK=
+  [[ $PROTO != $INP ]] || { PROTO=local; [[ $INP == /* ]] || INP="../$INP"; }
+  [[ $PROTO == local || $PROTO == root ]] || { echo "Input protocol $PROTO not supported"; exit 1; }
+  [[ $INP == *,unpack ]] && { UNPACK=1; INP=${INP//,unpack}; }
+  for ((I=1; I<=5; I++)); do
+    ERR=0
+    echo "Transferring $INP to the input box (attempt $I/5)"
+    case $PROTO in
+      local) cp -v "$INP" . && break || ERR=$? ;;
+      root)  timeout -s 9 ${ALIEN_JDL_COPYTIMEOUT:-100} xrdcp -f "$INP" . && break || ERR=$? ;;
+    esac
+  done
+  [[ $ERR == 0 ]] || { echo "Error copying files into the input box"; exit 1; }
+  if [[ $UNPACK ]]; then
+    INP=${INP##*/}
+    echo "Unpacking then removing $INP"
+    case "$INP" in
+      *.tar.bz2) UNPACK_CMD="tar xjvvf" ;;
+      *.tar.gz)  UNPACK_CMD="tar xzvvf" ;;
+      *.zip)     UNPACK_CMD="unzip"     ;;
+      *) echo "Unsupported archive format: $INP"; exit 1; ;;
+    esac
+    $UNPACK_CMD "$INP" || ERR=$?
+    rm -f "$INP"
+  fi
+  [[ $ERR == 0 ]] || { echo "Error unpacking files into the input box"; exit 1; }
+done
+echo "List of files in the working directory (recursive)"
+find . -ls
+echo "List of files ends here"
 echo "Output will be in $ALIEN_JDL_OUTPUTDIR"
 
 # Execute command and ignore errors
@@ -252,17 +253,33 @@ done
 PROTO=${ALIEN_JDL_OUTPUTDIR%%://*}
 [[ $PROTO != $ALIEN_JDL_OUTPUTDIR ]] || { PROTO=local; mkdir -p $ALIEN_JDL_OUTPUTDIR; }
 [[ $PROTO == local || $PROTO == root ]] || { echo "Output protocol $PROTO not supported;" exit 1; }
+: ${ALIEN_JDL_COPYNUMJOBS:=15}
+COPYSTATEDIR=$PWD/copystate
+mkdir $COPYSTATEDIR
 pushd to_transfer
+  COPYCOUNT=0
   while read FILE; do
-    for ((I=1; I<=5; I++)); do
-      ERR=0
-      echo "Transferring $FILE to $ALIEN_JDL_OUTPUTDIR (attempt $I/5)"
-      case $PROTO in
-        local) mkdir -p $(dirname "$ALIEN_JDL_OUTPUTDIR/$FILE"); cp -v $FILE $ALIEN_JDL_OUTPUTDIR/$FILE && break || ERR=$? ;;
-        root)  xrdcp -f $FILE $ALIEN_JDL_OUTPUTDIR/$FILE && break || ERR=$? ;;
-      esac
-    done
+    ln -nfs $FILE $COPYSTATEDIR/$COPYCOUNT
+    COPYCOUNT=$((COPYCOUNT+1))
   done < <(find . -type f | sed -e 's|^\./||')
+  for ((I=0; I<ALIEN_JDL_COPYNUMJOBS; I++)); do
+    ( while [[ 1 ]]; do
+        PLACEHOLDER=$(find $COPYSTATEDIR -type l -print -quit 2> /dev/null)
+        [[ $PLACEHOLDER ]] || break
+        FILE=$(readlink $PLACEHOLDER)
+        rm $PLACEHOLDER 2> /dev/null || continue
+        for ((J=1; J<=5; J++)); do
+          ERR=0
+          echo "Transferring $FILE to $ALIEN_JDL_OUTPUTDIR (attempt $J/5)"
+          case $PROTO in
+            local) mkdir -p $(dirname "$ALIEN_JDL_OUTPUTDIR/$FILE"); cp -v $FILE $ALIEN_JDL_OUTPUTDIR/$FILE && break || ERR=$? ;;
+            root)  timeout -s 9 ${ALIEN_JDL_COPYTIMEOUT:-100} xrdcp -f $FILE $ALIEN_JDL_OUTPUTDIR/$FILE && break || ERR=$? ;;
+          esac
+        done
+      done
+    ) &
+  done
+  wait
 popd
 
 # Cleanup all
