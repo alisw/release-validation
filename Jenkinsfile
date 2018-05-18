@@ -190,7 +190,8 @@ node("$RUN_ARCH-relval") {
            "CVMFS_NAMESPACE=$CVMFS_NAMESPACE",
            "DATASET=$DATASET",
            "DRYRUN=$DRYRUN",
-           "DONTMENTION=$DONT_MENTION",
+           "PARSEONLY=$PARSEONLY",
+           "DONTMENTION=$DONTMENTION",
            "MONKEYPATCH_TARBALL_URL=$MONKEYPATCH_TARBALL_URL",
            "REQUIRED_SPACE_GB=$REQUIRED_SPACE_GB",
            "REQUIRED_FILES=$REQUIRED_FILES",
@@ -258,22 +259,33 @@ node("$RUN_ARCH-relval") {
         eos_check_quota "$OUTPUT_XRD" "$REQUIRED_SPACE_GB" "$REQUIRED_FILES"
 
         # Add overrides to the JDL
-        cd release-validation/examples/$JDL_TO_RUN
-        [[ -e "${JDL_TO_RUN}.jdl" ]] || { echo "Cannot find ${JDL_TO_RUN}.jdl"; exit 1; }
-        cp -v /secrets/eos-proxy .  # fetch EOS proxy in workdir
-        preprocess_jdl "${JDL_TO_RUN}.jdl" "${JDL_TO_RUN}_override.jdl"
+        for THIS_JDL in $(echo "${JDL_TO_RUN//,/ }"); do
 
-        if [[ $DRYRUN == true ]]; then
-          RUN_DRYRUN="--dryrun"
-          DONTMENTION=true
-        fi
+          if [[ $DRYRUN == true ]]; then
+            RUN_DRYRUN="--dryrun"
+            DONTMENTION=true
+          fi
+          if [[ $PARSEONLY == true ]]; then
+            PARSEONLY="--parse-only"
+            JIRA_ISSUE=
+          fi
 
-        # Start the Release Validation (notify on JIRA before and after)
-        jira_relval_started  "$JIRA_ISSUE" "$OUTPUT_URL" "${TAGS// /, }" "$DONTMENTION" || true
-        RV=0
-        jdl2makeflow ${RUN_DRYRUN} --force --run "${JDL_TO_RUN}.jdl" -T wq -N alirelval_${RELVAL_NAME} -r 3 -C wqcatalog.marathon.mesos:9097 || RV=$?
-        jira_relval_finished "$JIRA_ISSUE" $RV "$OUTPUT_URL" "${TAGS// /, }" "$DONTMENTION" || true
-        exit $RV
+          pushd release-validation/examples/$THIS_JDL
+            echo "=== Starting release validation for $THIS_JDL ==="
+            [[ -e "${THIS_JDL}.jdl" ]] || { echo "Cannot find ${THIS_JDL}.jdl"; exit 1; }
+            cp -v /secrets/eos-proxy .  # fetch EOS proxy in workdir
+            preprocess_jdl "${THIS_JDL}.jdl" "${THIS_JDL}_override.jdl"
+
+            # Start the Release Validation (notify on JIRA before and after)
+            jira_relval_started  "$JIRA_ISSUE" "$OUTPUT_URL" "${TAGS// /, }" "$DONTMENTION" || true
+            RV=0
+            jdl2makeflow ${PARSEONLY} ${RUN_DRYRUN} --force --run "${THIS_JDL}.jdl" -T wq -N alirelval_${RELVAL_NAME} -r 3 -C wqcatalog.marathon.mesos:9097 || RV=$?
+            jira_relval_finished "$JIRA_ISSUE" $RV "$OUTPUT_URL" "${TAGS// /, }" "$DONTMENTION" || true
+            [[ $RV == 0 ]] || exit $RV
+          popd
+
+        done
+        exit 0
       '''
     }
   }

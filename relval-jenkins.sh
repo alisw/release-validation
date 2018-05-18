@@ -153,7 +153,7 @@ function jira_relval_finished() {
 
 # Function to preprocess the JDL
 # Usage:
-#   preprocess_jdl $JDL
+#   preprocess_jdl $JDL_IN $JDL_OUT
 function preprocess_jdl() {
   local JDL_IN=$1
   local JDL_OUT=$2
@@ -168,6 +168,33 @@ Split_override = "production:1-${LIMIT_FILES}";
 SplitArguments_replace = { "--nevents\\s[0-9]+", "--nevents \${LIMIT_EVENTS}" };
 OutputDir_override = "${OUTPUT_XRD}/${RELVAL_NAME}/MC/#alien_counter_04i#";
 EnvironmentCommand = "export PACKAGES=\"$ALIENV_PKGS\"; export CVMFS_NAMESPACE=\"$CVMFS_NAMESPACE\"; source custom_environment.sh; type aliroot";
+EoF
+  elif grep -q '/aliroot_dpg' "$JDL_IN"; then
+    # JDL belongs to a Reconstruction
+    LHC_PERIOD=$(head -n1 input_files.txt | grep -oE '/LHC[0-9]{2}[^/]/')
+    LHC_PERIOD=${LHC_PERIOD//\/}
+    RUN_NUMBER=$(head -n1 input_files.txt | grep -oE '/[0-9]{9}/')
+    RUN_NUMBER=$(( 10#${RUN_NUMBER//\/} ))
+    cat <<EoF >> "$JDL_OUT"
+X509_USER_PROXY = "\$PWD/eos-proxy";
+OCDB_PATH = "/cvmfs/alice-ocdb.cern.ch";
+EVENTS_PER_JOB = "$LIMIT_EVENTS";
+ALIROOT_FORCE_COREDUMP = "1";
+ExtraVariables = { "X509_USER_PROXY", "OCDB_PATH", "EVENTS_PER_JOB", "ALIROOT_FORCE_COREDUMP" };
+InputFile_override = { "eos-proxy", "local_environment.sh" };
+Output_append = { "core*", "validation_report.txt" };
+OutputDir_override = "${OUTPUT_XRD}/${RELVAL_NAME}/reco/#alien_counter_04i#";
+EnvironmentCommand = "source local_environment.sh";
+InputDataCollection_override = "input_files.txt";
+Packages = { $(for P in $ALIENV_PKGS; do echo \"$P\",; done)"" };
+SplitArguments_override = "$(basename $(head -n1 input_files.txt))/#alienfilename# \$EVENTS_PER_JOB \$(( 10#\$(echo #alienfilename# | cut -b3-11) )) raw://";
+NoLiveOutput = 0;
+DontArchive = 1;
+LPMRunNumber = "$RUN_NUMBER";
+LPMAnchorRun = "$RUN_NUMBER";
+LPMProductionTag = "$LHC_PERIOD";
+LPMAnchorProduction = "$LHC_PERIOD";
+LimitInputFiles = "$LIMIT_FILES";
 EoF
   else
     # Other JDL: not supported at the moment
