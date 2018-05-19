@@ -28,7 +28,11 @@ stages_reco = [
                 [ "cpass1" ],
                 [ "cpass1Merge", "cpass1ResMerge" ],
                 [ "cpass1QaMerge" ],
-                [ "cpass1QaPlots" ]
+                [ "cpass1QaPlots" ],
+                # PPass
+                [ "ppass" ],
+                [ "ppassQaMerge", "ppassResMerge" ],
+                [ "ppassQaPlots" ],
               ]
 stages_flat = [ y for x in stages_mc+stages_reco for y in x  ]
 
@@ -448,7 +452,7 @@ if jdl["JobType"] == "MC":
 elif jdl["JobType"] == "Reco":
   all_inputs["cpass0"] = jdl["InputFile"]
   stages = stages_reco
-  steps = [ "CPass0", "CPass0_SPC", "CPass1" ]  # "PPass"
+  steps = [ "CPass0", "CPass0_SPC", "CPass1", "PPass" ]
 else:
   print("Cannot recognize job type, only MC and Reco are supported")
   exit(1)
@@ -752,6 +756,95 @@ elif jdl["JobType"] == "Reco":
       delete=[ "JobRange", "InputFilesFromList" ])
   del inputs
 
+  #
+  # PPass
+  #
+
+  # ppass
+  jdls["ppass"] = \
+    get_preprocessed_jdl(args.jdl,
+      override={ "Output": [ "log_archive.zip:*.log@disk=1",
+                             "root_archive.zip:AliESDs.root,AliESDfriends.root,Merged.QA.Data*.root,*.ESD.tag.root@disk=2",
+                             "QA_archive.zip:QAresults*.root,*.stat.qa*,event_stat*.root,trending*.root@disk=2",
+                             "aod_archive.zip:pyxsec*.root,AODQA.root,AliAOD*.root,FilterEvents_Trees*.root,*.stat.aod@disk=2",
+                             "EventStat_temp*.root@disk=2",
+                             "validation_report.txt",
+                             "core*" ],
+                 "OutputDir": jdl["OutputDir"].replace("/cpass0_pass1/", "/pass1/"),
+                 "Executable": "aliroot_dpgPPass.sh",
+                 "SplitArguments": os.path.join(os.path.dirname(jdl["InputFilesFromList"][0]), "#alienfilename#"),
+                 "LPMPass": "2",
+                 "LPMPassName": "pass1",
+                 "LPMRAWPassID": "2",
+                 "LPMCPassMode": "-1",
+                 "RAWPRODTYPE": "ppass"
+               },
+      append={ "InputFile": [ os.path.join(os.path.dirname(preprocess_var(jdls["cpass1"]["OutputDir"], sh_mode=False)), "OCDB", "OCDB.tar.bz2,unpack") ],
+               "JDLVariables": [ "RAWPRODTYPE" ] },
+      delete=[])
+
+  # ppassResMerge
+  jdls["ppassResMerge"] = \
+    get_preprocessed_jdl(args.jdl,
+              override={ "Output": [ "spcm_archive.zip:pyxsec*.root,AODQA.root,AliAOD*.root,FilterEvents_Trees*.root,*.stat*,EventStat_temp*.root,Residual*.root,TOFcalibTree.root,std*,fileinfo*.log@disk=2",
+                                     "validation_report.txt",
+                                     "core*" ],
+                         "OutputDir": os.path.join(os.path.dirname(preprocess_var(jdls["ppass"]["OutputDir"], sh_mode=False)),
+                                                   "MergedTrees", "001"),
+                         "Executable": "merge.sh",
+                         "InputXML": "eventtrees_ppass.xml",
+                         "LPMCollectionEntity": "FilterEvents_Trees.root",
+                         "NoGridConnect": "1",
+                         "SplitArguments": "" },
+              append={ "InputFile": [ "eventtrees_ppass.xml" ],
+                       "JDLVariables": [ "LPMCollectionEntity", "InputXML", "NoGridConnect" ] },
+              delete=[ "JobRange", "InputFilesFromList" ])
+  xmls["eventtrees_ppass.xml"] = \
+    get_alien_xml(os.path.join(jdls["ppass"]["OutputDir"], "ResidualTrees.root"),
+                               jdls["ppass"]["JobRange"][0], jdls["ppass"]["JobRange"][1],
+                               jdls["ppass"]["InputFilesFromList"])
+
+  # ppassQaMerge
+  inputfile = "finalqa_ppass.txt" if jdls["ppass"]["DontArchive"] or jdls["ppass"]["SaveAll"] else "finalqa_ppass.xml"
+  jdls["ppassQaMerge"] = \
+    get_preprocessed_jdl(args.jdl,
+      override={ "Output": [ "QA_merge_log_archive.zip:std*,fileinfo*.log@disk=1",
+                             "QA_merge_archive.zip:*QAresults*.root,EventStat_temp*.root,trending*.root,event_stat*.root,*.stat*@disk=3",
+                             "validation_report.txt",
+                             "core*" ],
+                 "OutputDir": os.path.dirname(preprocess_var(jdls["ppass"]["OutputDir"], sh_mode=False)),
+                 "Executable": "train_merge.sh",
+                 "SplitArguments": "%s 5" % inputfile },  # 5 means "final stage"
+      append={ "InputFile": [ inputfile ] },
+      delete=[ "JobRange" ])
+  if inputfile.endswith(".xml"):
+    xmls[inputfile] = \
+      get_alien_xml(os.path.join(jdls["ppass"]["OutputDir"], "QA_archive.zip"),
+                                 jdls["ppass"]["JobRange"][0], jdls["ppass"]["JobRange"][1],
+                                 jdls["ppass"]["InputFilesFromList"])
+  else:
+    pattern = preprocess_var(jdls["ppass"]["OutputDir"], sh_mode=False)
+    txts[inputfile] = "\n".join([ j2env.from_string(pattern).render(alien_counter=ji, input_files=jdls["ppass"]["InputFilesFromList"])
+                                  for ji in range(jdls["ppass"]["JobRange"][0], jdls["ppass"]["JobRange"][1]+1) ]) + "\n"
+    del pattern
+  del inputfile
+
+  # ppassQaPlots
+  inputs = [ "QAresults.root", "QAresults_AOD.root", "QAresults_merged.root", "QAresults_barrel.root",
+             "QAresults_outer.root", "FilterEvents_Trees.root", "event_stat.root",
+             "event_stat_barrel.root", "event_stat_outer.root" ] \
+           if jdls["ppass"]["DontArchive"] or jdls["ppass"]["SaveAll"] else \
+           [ "QA_merge_archive.zip" ]
+  jdls["ppassQaPlots"] = \
+    get_preprocessed_jdl(args.jdl,
+      override={ "Output": [ "qa_plots/*", "std*", "core*", "validation_report.txt" ],
+                 "OutputDir": os.path.join(os.path.dirname(preprocess_var(jdls["ppass"]["OutputDir"], sh_mode=False)), "QAplots_PPass"),
+                 "Executable": "qa_plots.sh",
+                 "SplitArguments": " ".join([ os.path.join(os.path.dirname(preprocess_var(jdls["ppass"]["OutputDir"], sh_mode=False)), x) for x in inputs ]) },
+      append={ "InputFile": [ "qa_plots.sh" ] },
+      delete=[ "JobRange", "InputFilesFromList" ])
+  del inputs
+
 else:
   assert False, "should not happen: jdl[\"JobType\"] should be handled at this point"
 
@@ -1001,6 +1094,26 @@ timeBins.log {{ "cpass0SpBins"|job_head }} cpass0Merge.done cpass0ResMerge.done
 # cpass1QaPlots
 {{ "cpass1QaPlots"|job_head }} cpass1QaMerge.done
 {{ "cpass1QaPlots"|job_cmd }}
+{% endif %}
+
+{% if step == "PPass" %}
+# ppass
+{% for jobindex in range(joba,jobb) -%}
+{{ "ppass"|job_head(index=jobindex) }} cpass1Merge.done
+{{ "ppass"|job_cmd(index=jobindex) }}
+{% endfor %}
+
+# ppassResMerge
+{{ "ppassResMerge"|job_head }}{% for j in range(joba,jobb) %}{{ " ppass%04d.done"|format(j) }}{% endfor %}
+{{ "ppassResMerge"|job_cmd }}
+
+# ppassQaMerge
+{{ "ppassQaMerge"|job_head }}{% for j in range(joba,jobb) %}{{ " ppass%04d.done"|format(j) }}{% endfor %}
+{{ "ppassQaMerge"|job_cmd }}
+
+# ppassQaPlots
+{{ "ppassQaPlots"|job_head }} ppassQaMerge.done
+{{ "ppassQaPlots"|job_cmd }}
 {% endif %}
 """)
   with open(os.path.join(args.work_dir, "Makeflow_"+step), "w") as mf:

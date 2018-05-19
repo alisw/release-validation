@@ -141,7 +141,7 @@ function jira_relval_finished() {
   local QAPLOTS
   [[ $JOB_TYPE == sim ]] \
     && QAPLOTS="[QA plots|$DISPLAY_URL/QAplots_passMC]" \
-    || QAPLOTS="QA plots for [CPass1|$DISPLAY_URL/QAplots_CPass1] and [PPass|$DISPLAY_URL/QAplots_CPass2]"
+    || QAPLOTS="QA plots for [CPass1|$DISPLAY_URL/QAplots_CPass1] and [PPass|$DISPLAY_URL/QAplots_PPass]"
 
   jira_comment "$JIRA_ISSUE"                                                                         \
     "Release validation for *${VERSIONS_STR}* finished with ${JIRASTATUS}.\n"                        \
