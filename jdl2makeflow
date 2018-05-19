@@ -243,10 +243,17 @@ for CORE in core*; do
 done >> validation_report.txt 2> /dev/null
 cat validation_report.txt | xargs -n1 -I{} echo "$ALIEN_JDL_OUTPUTDIR/{}" > validation_report.txt.0
 mv validation_report.txt.0 validation_report.txt
-
+{{""}}
+{% if dry_run -%}
+# Dry run: creating dummy output files to make Makeflow happy
+pushd $(dirname $DONEFILE) &> /dev/null
+  [[ $ALIEN_JDL_TRANSFERTOMAKEFLOW ]] && touch $ALIEN_JDL_TRANSFERTOMAKEFLOW
+popd &> /dev/null
+{% else -%}
 # Make some files available to Makeflow directly too
 [[ $ALIEN_JDL_TRANSFERTOMAKEFLOW ]] && cp -v $ALIEN_JDL_TRANSFERTOMAKEFLOW $(dirname $DONEFILE)/
-
+{% endif -%}
+{{""}}
 # Compress output according to the output list
 mkdir to_transfer
 shopt -s extglob
@@ -1006,7 +1013,7 @@ for step in steps:
       os.remove(tbf)
   elif step == "CPass0_SPC":
     print("CPass0_SPC: parsing time bins")
-    if not os.path.isfile(tbf) and not args.run:
+    if (not os.path.isfile(tbf) and not args.run) or (args.run and args.dry_run):
       print("CPass0_SPC: WARNING: could not find timeBins.log, creating a dummy one!")
       with open(tbf, "w") as fp:
         fp.write("0 0 0\n")
