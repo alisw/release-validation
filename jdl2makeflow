@@ -891,7 +891,7 @@ for step in steps:
   # Special instructions for certain steps: may affect Makeflow creation
   tbf = os.path.join(args.work_dir, "timeBins.log")
   if step == "CPass0":
-    if os.path.isfile(tbf) and args.run:
+    if os.path.isfile(tbf) and args.run and (not args.start_at or stages_flat.index(args.start_at) < stages_flat.index("cpass0SpDistMaps")):
       os.remove(tbf)
   elif step == "CPass0_SPC":
     print("CPass0_SPC: parsing time bins")
