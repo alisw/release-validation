@@ -245,6 +245,9 @@ node("$RUN_ARCH-relval") {
         export X509_USER_PROXY=$PWD/eos-proxy
         eos_check_quota "$OUTPUT_XRD" "$REQUIRED_SPACE_GB" "$REQUIRED_FILES"
 
+        # Global exit code
+        EXITCODE=0
+
         # Add overrides to the JDL
         for THIS_JDL in $(echo "${JDL_TO_RUN//,/ }"); do
 
@@ -287,16 +290,16 @@ node("$RUN_ARCH-relval") {
 
             # Start the Release Validation (notify on JIRA before and after)
             jira_relval_started  "$JIRA_ISSUE" "$OUTPUT_URL/$JOB_TYPE" "${TAGS// /, }" "$DONT_MENTION" || true
-            RV=0
             set -x
-            jdl2makeflow ${PARSE_ONLY_SWITCH} ${DRY_RUN_SWITCH} --remove --run "${THIS_JDL}.jdl" -T wq -N alirelval_${RELVAL_NAME} -r 3 -C wqcatalog.marathon.mesos:9097 || RV=$?
+            THIS_EXITCODE=0
+            jdl2makeflow ${PARSE_ONLY_SWITCH} ${DRY_RUN_SWITCH} --remove --run "${THIS_JDL}.jdl" -T wq -N alirelval_${RELVAL_NAME} -r 3 -C wqcatalog.marathon.mesos:9097 || THIS_EXITCODE=$?
             set +x
-            jira_relval_finished "$JIRA_ISSUE" $RV "$OUTPUT_URL/$JOB_TYPE" "${TAGS// /, }" "$DONT_MENTION" || true
-            [[ $RV == 0 ]] || exit $RV
+            jira_relval_finished "$JIRA_ISSUE" $THIS_EXITCODE "$OUTPUT_URL/$JOB_TYPE" "${TAGS// /, }" "$DONT_MENTION" || true
+            [[ $THIS_EXITCODE == 0 ]] || EXITCODE=$THIS_EXITCODE  # propagate globally (will cause visible Jenkins error), but continue
           popd &> /dev/null
 
         done
-        exit 0
+        exit $EXITCODE
       '''
     }
   }

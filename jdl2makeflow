@@ -1055,6 +1055,12 @@ for step in steps:
       fp.write(buf)
     del buf
 
+  # Remove validation report if appropriate
+  vf = os.path.join(args.work_dir, "validation_report_full.txt")
+  idx = max([ stages_flat.index(x) for x in stages_flat if x.startswith("mergeValidationReports") ])
+  if os.path.isfile(vf) and args.run and (not args.start_at or stages_flat.index(args.start_at) <= idx):
+    os.remove(vf)
+
   print("Generating Makeflow_%s" % step)
   makeflow = j2env.from_string("""
 # Makeflow_{{step}} -- automatically generated
@@ -1202,4 +1208,17 @@ validation_report_full.txt {{ "mergeValidationReportsReco"|job_head }} ppassQaPl
     exit(rv)
   os.chdir(wd)
   print("Step %s finished successfully" % step)
+
+if args.run:
+  vf = os.path.join(args.work_dir, "validation_report_full.txt")
+  if os.path.isfile(vf):
+    if os.stat(vf).st_size == 0:
+      print("Validation report %s is empty: no problems occurred!" % vf)
+      exit(0)
+    else:
+      print("ERROR: validation report %s is not empty: errors occurred" % vf)
+      exit(1)
+  else:
+    print("Validation report not found: assuming success")
+    exit(0)
 exit(0)

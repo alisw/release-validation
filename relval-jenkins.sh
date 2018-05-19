@@ -133,8 +133,10 @@ function jira_relval_finished() {
   local DISPLAY_URL=$3
   local VERSIONS_STR=$4
   local DONTMENTION=$5
+  local JIRASUMMARY
   [[ $EXITCODE == 0 ]] && JIRASTATUS="*{color:green}success{color}*" \
                        || JIRASTATUS="*{color:red}errors{color}*"
+  [[ $EXITCODE == 0 ]] || JIRASUMMARY=" * [Errors summary|$DISPLAY_URL/validation_report_full.txt]\n"
   local TAGFMT='[~%s]'
   [[ $DONTMENTION == true ]] && TAGFMT='{{~%s}}'
 
@@ -144,12 +146,13 @@ function jira_relval_finished() {
     || QAPLOTS="QA plots for [CPass1|$DISPLAY_URL/QAplots_CPass1] and [PPass|$DISPLAY_URL/QAplots_PPass]"
 
   jira_comment "$JIRA_ISSUE"                                                                         \
-    "Release validation for *${VERSIONS_STR} ($JOB_TYPE)* finished with ${JIRASTATUS}.\n"                        \
+    "Release validation for *${VERSIONS_STR} ($JOB_TYPE)* finished with ${JIRASTATUS}.\n"            \
     " * [Jenkins log|$BUILD_URL/console]\n"                                                          \
     " * [Validation output|$DISPLAY_URL]\n"                                                          \
+    "$JIRASUMMARY"                                                                                   \
     " * ${QAPLOTS}\n"                                                                                \
     "\n"                                                                                             \
-    "Contact persons for detectors and components:\n"                                     \
+    "Contact persons for detectors and components:\n"                                                \
     "$(for D in "${DETECTORS[@]}"; do
          printf " * ${D%%:*}:"; for R in ${D#*:}; do printf " $TAGFMT" "$R"; done; echo -n "\n"
        done)"
