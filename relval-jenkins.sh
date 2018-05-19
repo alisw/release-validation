@@ -117,7 +117,7 @@ function jira_relval_started() {
   local VERSIONS_STR=$3
   local DONTMENTION=$4
   jira_comment "$JIRA_ISSUE" \
-               "Release validation for *${VERSIONS_STR}* started.\n" \
+               "Release validation for *${VERSIONS_STR} ($JOB_TYPE)* started.\n" \
                " * [Jenkins log|${BUILD_URL}/console]\n" \
                " * [Validation output|${DISPLAY_URL}] (it might be still empty)\n"
   [[ $DONTMENTION != true ]] && jira_watchers "$JIRA_ISSUE" "${JIRA_WATCHERS[@]}" || true
@@ -144,7 +144,7 @@ function jira_relval_finished() {
     || QAPLOTS="QA plots for [CPass1|$DISPLAY_URL/QAplots_CPass1] and [PPass|$DISPLAY_URL/QAplots_PPass]"
 
   jira_comment "$JIRA_ISSUE"                                                                         \
-    "Release validation for *${VERSIONS_STR}* finished with ${JIRASTATUS}.\n"                        \
+    "Release validation for *${VERSIONS_STR} ($JOB_TYPE)* finished with ${JIRASTATUS}.\n"                        \
     " * [Jenkins log|$BUILD_URL/console]\n"                                                          \
     " * [Validation output|$DISPLAY_URL]\n"                                                          \
     " * ${QAPLOTS}\n"                                                                                \
