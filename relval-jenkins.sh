@@ -135,16 +135,21 @@ function jira_relval_finished() {
   local DONTMENTION=$5
   [[ $EXITCODE == 0 ]] && JIRASTATUS="*{color:green}success{color}*" \
                        || JIRASTATUS="*{color:red}errors{color}*"
-  TAGFMT='[~%s]'
+  local TAGFMT='[~%s]'
   [[ $DONTMENTION == true ]] && TAGFMT='{{~%s}}'
+
+  local QAPLOTS
+  [[ $JOB_TYPE == sim ]] \
+    && QAPLOTS="[QA plots|$DISPLAY_URL/QAplots_passMC]" \
+    || QAPLOTS="QA plots for [CPass1|$DISPLAY_URL/QAplots_CPass1] and [PPass|$DISPLAY_URL/QAplots_CPass2]"
+
   jira_comment "$JIRA_ISSUE"                                                                         \
-    "Release validation for *${VERSIONS_STR}* finished with ${JIRASTATUS}.\n"           \
+    "Release validation for *${VERSIONS_STR}* finished with ${JIRASTATUS}.\n"                        \
     " * [Jenkins log|$BUILD_URL/console]\n"                                                          \
     " * [Validation output|$DISPLAY_URL]\n"                                                          \
-    " * Validation summary: [HTML|$DISPLAY_URL/summary.html], [text|$DISPLAY_URL/summary.log]\n"     \
-    " * QA plots for [CPass1|$DISPLAY_URL/QAplots_CPass1] and [PPass|$DISPLAY_URL/QAplots_CPass2]\n" \
+    " * ${QAPLOTS}\n"                                                                                \
     "\n"                                                                                             \
-    "Mentioning contact persons for detectors and components:\n"                                     \
+    "Contact persons for detectors and components:\n"                                     \
     "$(for D in "${DETECTORS[@]}"; do
          printf " * ${D%%:*}:"; for R in ${D#*:}; do printf " $TAGFMT" "$R"; done; echo -n "\n"
        done)"
