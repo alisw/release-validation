@@ -2,3 +2,4 @@ include jdl2makeflow_helpers/spc_merge.C
 include jdl2makeflow_helpers/spc_merge.sh
 include jdl2makeflow_helpers/aliprod_train_merge.sh
 include jdl2makeflow_helpers/qa_plot.sh
+include jdl2makeflow_helpers/merge_validation_reports.sh

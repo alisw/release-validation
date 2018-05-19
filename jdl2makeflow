@@ -16,7 +16,8 @@ lib_path = os.path.abspath(os.path.dirname(jdl2makeflow_helpers.__file__))
 # Tiers definition of stages for MC and for Reco. Jobs on each tier can be executed in parallel
 stages_mc = [ [ "sim" ],
               [ "simResMerge", "simQaMerge" ],
-              [ "simQaPlots" ] ]
+              [ "simQaPlots" ],
+              [ "MergeValidationReportsMC" ] ]
 stages_reco = [
                 # CPass0
                 [ "cpass0" ],
@@ -33,6 +34,8 @@ stages_reco = [
                 [ "ppass" ],
                 [ "ppassQaMerge", "ppassResMerge" ],
                 [ "ppassQaPlots" ],
+                # Validation reports
+                [ "mergeValidationReportsReco" ]
               ]
 stages_flat = [ y for x in stages_mc+stages_reco for y in x  ]
 
@@ -850,6 +853,19 @@ elif jdl["JobType"] == "Reco":
 else:
   assert False, "should not happen: jdl[\"JobType\"] should be handled at this point"
 
+# Merge validation reports (common to all)
+jdls["mergeValidationReports" + jdl["JobType"]] = \
+  get_preprocessed_jdl(args.jdl,
+    override={ "Output": [ "validation_report_full.txt" ],
+               "OutputDir": os.path.join(os.path.dirname(os.path.dirname(preprocess_var(jdl["OutputDir"], sh_mode=False)))),
+               "Executable": "merge_validation_reports.sh",
+               "Arguments": "validation_report_list.txt",
+               "transferToMakeflow": "validation_report_full.txt"
+             },
+    append={ "InputFile": [ "merge_validation_reports.sh", "validation_report_list.txt,late" ],
+             "JDLVariables": [ "transferToMakeflow" ] },
+    delete=[ "JobRange", "InputFilesFromList" ])
+
 if args.parse or args.parse_only:
   for j in jdls:
     print("# JSONized JDL: %s" % j)
@@ -1003,6 +1019,7 @@ for step in steps:
     # Those are not real input files, but they are passed as "input file" parameter of each job in
     # order to make it possible to parse #alienfilename# in the OutputDir formation
     jdls["cpass0SpDistMaps"]["InputFilesFromList"] = [ x.replace(" ", "_") for x in jdls["cpass0SpDistMaps"]["timeBins"] ]
+    jdls["cpass0SpDistMaps"]["JobRange"] = [ 0, len(jdls["cpass0SpDistMaps"]["timeBins"])-1 ]
 
     # Dynamically generate alitpcdcalibres.txt
     print("CPass0_SPC: generating collection of output files")
@@ -1017,6 +1034,26 @@ for step in steps:
       print("CPass0_SPC: touching done files")
       for i in range(0, len(jdls["cpass0SpDistMaps"]["timeBins"])):
         open(os.path.join(args.work_dir, "cpass0SpDistMaps%04d.done" % i), "w").close()
+
+  # Recollection of validation reports: file list
+  if step == "MCPass" or steps.index(step) >= steps.index("CPass0_SPC"):
+    buf = ""
+    for j in jdls:
+      if j.startswith("mergeValidationReports"):
+        continue
+      if not "validation_report.txt" in jdls[j].get("Output", []):
+        print("WARNING: no validation reporting in job %s" % j)
+        continue
+      if "JobRange" in jdls[j]:
+        pattern = os.path.join(preprocess_var(jdls[j]["OutputDir"], sh_mode=False), "validation_report.txt")
+        buf += "\n".join([ j2env.from_string(pattern).render(alien_counter=ji, input_files=jdls[j]["InputFilesFromList"])
+                                      for ji in range(jdls[j]["JobRange"][0], jdls[j]["JobRange"][1]+1) ]) + "\n"
+        del pattern
+      else:
+        buf += os.path.join(preprocess_var(jdls[j]["OutputDir"], sh_mode=False), "validation_report.txt") + "\n"
+    with open(os.path.join(args.work_dir, "validation_report_list.txt"), "w") as fp:
+      fp.write(buf)
+    del buf
 
   print("Generating Makeflow_%s" % step)
   makeflow = j2env.from_string("""
@@ -1040,6 +1077,10 @@ for step in steps:
 # simQaPlots
 {{ "simQaPlots"|job_head }} simQaMerge.done
 {{ "simQaPlots"|job_cmd }}
+
+# mergeValidationReportsMC
+validation_report_full.txt {{ "mergeValidationReportsMC"|job_head }} simQaPlots.done
+{{ "mergeValidationReportsMC"|job_cmd }}
 {% endif %}
 
 {% if step == "CPass0" %}
@@ -1116,6 +1157,10 @@ timeBins.log {{ "cpass0SpBins"|job_head }} cpass0Merge.done cpass0ResMerge.done
 # ppassQaPlots
 {{ "ppassQaPlots"|job_head }} ppassQaMerge.done
 {{ "ppassQaPlots"|job_cmd }}
+
+# mergeValidationReportsReco
+validation_report_full.txt {{ "mergeValidationReportsReco"|job_head }} ppassQaPlots.done
+{{ "mergeValidationReportsReco"|job_cmd }}
 {% endif %}
 """)
   with open(os.path.join(args.work_dir, "Makeflow_"+step), "w") as mf:
