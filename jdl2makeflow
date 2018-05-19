@@ -141,6 +141,13 @@ OUTPUT_LIST=({% for x in output_list -%}
              "{{x}}"
              {% endfor %})
 {{""}}
+# Copy Makeflow-provided files first
+for INP in "${INPUT_LIST[@]}"; do
+  [[ ${INP%%://*} == $INP ]] || continue  # local file (no protocol)
+  [[ $INP != /* ]] || continue            # no full path
+  cp -v ../"$INP" .
+done
+{{""}}
 {% if env_cmd -%}
 # Set custom environment (handling potential concurrency issues on our side)
 LOCKDIR=/tmp/makeflow_env_lock
@@ -165,9 +172,11 @@ eval $(/cvmfs/alice.cern.ch/bin/alienv printenv {{packages|join(",")}})
 export {{x}}="{{environment[x]|replace('"', '\\\\"')}}"
 {% endfor -%}
 {{""}}
+# Prepare input box
 for INP in "${INPUT_LIST[@]}"; do
   PROTO=${INP%%://*}
   UNPACK=
+  [[ $INP == /* ]] || continue  # Makeflow files have been copied already
   [[ $PROTO != $INP ]] || { PROTO=local; [[ $INP == /* ]] || INP="../$INP"; }
   [[ $PROTO == local || $PROTO == root ]] || { echo "Input protocol $PROTO not supported"; exit 1; }
   [[ $INP == *,unpack ]] && { UNPACK=1; INP=${INP//,unpack}; }
