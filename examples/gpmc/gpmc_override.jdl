@@ -9,6 +9,6 @@ MC_SEED = "1#alien_counter_04i#";
 ExtraVariables = { "X509_USER_PROXY", "CONFIG_OCDB", "OCDB_PATH", "MC_SEED" };
 UncommentForEOS_OutputDir_override = "root://eospublic.cern.ch//eos/experiment/alice/release-validation/output/gpmc001/#alien_counter_04i#";
 OutputDir_override = "/tmp/relval/gpmc/#alien_counter_04i#";
-EnvironmentCommand = "source local_envirnment.sh";
+EnvironmentCommand = "source local_environment.sh";
 NoLiveOutput = 0;
 DontArchive = 1;
