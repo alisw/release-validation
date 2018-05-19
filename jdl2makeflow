@@ -283,6 +283,7 @@ pushd to_transfer
             root)  timeout -s 9 ${ALIEN_JDL_COPYTIMEOUT:-100} xrdcp -f $FILE $ALIEN_JDL_OUTPUTDIR/$FILE && break || ERR=$? ;;
           esac
         done
+        [[ $ERR == 0 ]] || { echo "Error copying output files"; exit 1; }
       done
     ) &
   done
