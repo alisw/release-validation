@@ -233,11 +233,13 @@ $PROG $ARGS $*  > >(tee -a stdout.log{% if no_live_out %} &> /dev/null{% endif %
 
 # Produce validation report
 touch validation_report.txt
-grep -H -E 'std::bad_alloc|Segmentation violation|Segmentation fault|Bus error|floating point exception|Killed|busy flag cleared|Cannot Build the PAR Archive|\\*\\*\\* glibc detected \\*\\*\\*|E-AliCDBGrid::PutEntry:|F-AliCDBGrid::|E-TAlienFile::ReadBuffer: The remote \\(removed\\) file is not open' *.log *.nonesiste > validation_report.txt 2> /dev/null || true
+grep -H -E 'std::bad_alloc|Segmentation violation|Segmentation fault|Bus error|floating point exception|Killed|busy flag cleared|Cannot Build the PAR Archive|\\*\\*\\* glibc detected \\*\\*\\*|E-AliCDBGrid::PutEntry:|F-AliCDBGrid::|E-TAlienFile::ReadBuffer: The remote \\(removed\\) file is not open' *.log > validation_report.txt 2> /dev/null || true
 for CORE in core*; do
   [[ -e $CORE ]] || continue
-  echo "$CORE: core dumped"
-done > validation_report.txt 2> /dev/null
+  echo "$CORE:core dumped"
+done >> validation_report.txt 2> /dev/null
+cat validation_report.txt | xargs -n1 -I{} echo "$ALIEN_JDL_OUTPUTDIR/{}" > validation_report.txt.0
+mv validation_report.txt.0 validation_report.txt
 
 # Make some files available to Makeflow directly too
 [[ $ALIEN_JDL_TRANSFERTOMAKEFLOW ]] && cp -v $ALIEN_JDL_TRANSFERTOMAKEFLOW $(dirname $DONEFILE)/
