@@ -272,9 +272,13 @@ node("$RUN_ARCH-relval") {
               curl $CURLOPTS -X DELETE "http://leader.mesos:8080/v2/apps/wqmesos/tasks?scale=true" || true
               echo "Stopping catalog..."
               curl $CURLOPTS -X DELETE "http://leader.mesos:8080/v2/apps/wqcatalog/tasks?scale=true" || true
+              echo "Waiting for catalog to stop..."
+              for ((I=0; I<90; I++)); do
+                curl $CURLOPTS "http://wqcatalog.marathon.mesos:9097" && { sleep 1; continue; } || break
+              done
               echo "Starting catalog..."
               curl $CURLOPTS -X PUT -H "Content-type: application/json" --data '{ "instances": 1 }' "http://leader.mesos:8080/v2/apps/wqcatalog?force=true"
-              echo "Waiting for catalog deployment..."
+              echo "Waiting for catalog to start..."
               for ((I=0; I<90; I++)); do
                 curl $CURLOPTS "http://wqcatalog.marathon.mesos:9097" || { sleep 1; continue; }
                 break
