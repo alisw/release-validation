@@ -181,6 +181,8 @@ node("$RUN_ARCH-relval") {
            "REQUIRED_SPACE_GB=$REQUIRED_SPACE_GB",
            "REQUIRED_FILES=$REQUIRED_FILES",
            "JIRA_ISSUE=$JIRA_ISSUE",
+           "SIM_START_AT=$SIM_START_AT",
+           "REC_START_AT=$REC_START_AT",
            "JDL_TO_RUN=$JDL_TO_RUN",
            "RELVAL_TIMESTAMP=$RELVAL_TIMESTAMP",
            "RELVAL=$RELVAL",
@@ -291,12 +293,15 @@ node("$RUN_ARCH-relval") {
             cp -v /secrets/eos-proxy .  # fetch EOS proxy in workdir
             preprocess_jdl "${THIS_JDL}.jdl" "${THIS_JDL}_override.jdl"
             echo "Job type was determined to be: ${JOB_TYPE}"
+            START_AT=
+            [[ $JOB_TYPE == rec ]] && START_AT=$REC_START_AT
+            [[ $JOB_TYPE == sim ]] && START_AT=$SIM_START_AT
 
             # Start the Release Validation (notify on JIRA before and after)
             jira_relval_started  "$JIRA_ISSUE" "$OUTPUT_URL/$RELVAL_NAME/$JOB_TYPE" "${TAGS// /, }" "$DONT_MENTION" || true
             set -x
             THIS_EXITCODE=0
-            jdl2makeflow ${PARSE_ONLY_SWITCH} ${DRY_RUN_SWITCH} --remove --run "${THIS_JDL}.jdl" -T wq -N alirelval_${RELVAL_NAME} -r 3 -C wqcatalog.marathon.mesos:9097 || THIS_EXITCODE=$?
+            jdl2makeflow ${PARSE_ONLY_SWITCH} ${DRY_RUN_SWITCH} ${START_AT:+--start-at $START_AT} --remove --run "${THIS_JDL}.jdl" -T wq -N alirelval_${RELVAL_NAME} -r 3 -C wqcatalog.marathon.mesos:9097 || THIS_EXITCODE=$?
             set +x
             jira_relval_finished "$JIRA_ISSUE" $THIS_EXITCODE "$OUTPUT_URL/$RELVAL_NAME/$JOB_TYPE" "${TAGS// /, }" "$DONT_MENTION" || true
             [[ $THIS_EXITCODE == 0 ]] || EXITCODE=$THIS_EXITCODE  # propagate globally (will cause visible Jenkins error), but continue
