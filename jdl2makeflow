@@ -17,7 +17,7 @@ lib_path = os.path.abspath(os.path.dirname(jdl2makeflow_helpers.__file__))
 stages_mc = [ [ "sim" ],
               [ "simResMerge", "simQaMerge" ],
               [ "simQaPlots" ],
-              [ "MergeValidationReportsMC" ] ]
+              [ "mergeValidationReportsMC" ] ]
 stages_reco = [
                 # CPass0
                 [ "cpass0" ],
