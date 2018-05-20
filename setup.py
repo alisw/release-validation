@@ -69,7 +69,9 @@ setup(
   # have to be included in MANIFEST.in as well.
   include_package_data=True,
   package_data={
-    "jdl2makeflow_helpers": [ "spc_merge.C", "spc_merge.sh", "train_merge.sh", "qa_plots.sh" ]
+    "jdl2makeflow_helpers": [ "spc_merge.C", "spc_merge.sh", "aliprod_train_merge.sh",
+                              "qa_plots.sh", "merge_validation_reports.sh",
+                              "cpass0SpCalib_fallback.sh" ]
   },
 
   # Although 'package_data' is the preferred approach, in some case you may

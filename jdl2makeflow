@@ -647,12 +647,13 @@ elif jdl["JobType"] == "Reco":
                              "OCDB_SPC.tar.bz2",
                              "core*" ],
                  "OutputDir": os.path.join(os.path.dirname(preprocess_var(jdl["OutputDir"], sh_mode=False)), "ResidualMerge", "TPCSPCalibration", "CorrectionMaps"),
-                 "Executable": "aliroot_createOCDBTPCSPDistCalib.sh",
-                 "Arguments": "inputFileList=alitpcdcalibres.txt startRun=%d endRun=%d" % (runNumber, runNumber),
+                 "Executable": "cpass0SpCalib_fallback.sh",
+                 "Arguments": "aliroot_createOCDBTPCSPDistCalib.sh inputFileList=alitpcdcalibres.txt startRun=%d endRun=%d" % (runNumber, runNumber),
                  "targetOCDBDir": "local://./OCDB",
                  "CreateOCDBArchive": "OCDB_SPC.tar.bz2"
                },
-      append={ "InputFile": [ "alitpcdcalibres.txt,late",  # late creation
+      append={ "InputFile": [ "cpass0SpCalib_fallback.sh",
+                              "alitpcdcalibres.txt,late",  # late creation
                               os.path.join(os.path.dirname(preprocess_var(jdl["OutputDir"], sh_mode=False)), "OCDB", "OCDB.tar.bz2,unpack") ],
                "JDLVariables": [ "targetOCDBDir", "CreateOCDBArchive" ] },
       delete=[ "JobRange", "InputFilesFromList" ])
