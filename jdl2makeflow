@@ -239,7 +239,7 @@ touch validation_report.txt
 grep -H -n -E 'std::bad_alloc|Segmentation violation|Segmentation fault|Bus error|floating point exception|Killed|busy flag cleared|Cannot Build the PAR Archive|\\*\\*\\* glibc detected \\*\\*\\*|E-AliCDBGrid::PutEntry:|F-AliCDBGrid::|E-TAlienFile::ReadBuffer: The remote \\(removed\\) file is not open' *.log > validation_report.txt 2> /dev/null || true
 for CORE in core*; do
   [[ -e $CORE ]] || continue
-  echo "$CORE:core dumped"
+  echo "$CORE:0:core dumped"
 done >> validation_report.txt 2> /dev/null
 {{""}}
 {% if dry_run -%}
@@ -864,7 +864,7 @@ else:
 jdls["mergeValidationReports" + jdl["JobType"]] = \
   get_preprocessed_jdl(args.jdl,
     override={ "Output": [ "validation_report_full.txt" ],
-               "OutputDir": os.path.join(os.path.dirname(os.path.dirname(preprocess_var(jdl["OutputDir"], sh_mode=False)))),
+               "OutputDir": os.path.dirname(preprocess_var(jdl["OutputDir"], sh_mode=False)),
                "Executable": "merge_validation_reports.sh",
                "Arguments": "validation_report_list.txt",
                "transferToMakeflow": "validation_report_full.txt"
@@ -872,6 +872,8 @@ jdls["mergeValidationReports" + jdl["JobType"]] = \
     append={ "InputFile": [ "merge_validation_reports.sh", "validation_report_list.txt,late" ],
              "JDLVariables": [ "transferToMakeflow" ] },
     delete=[ "JobRange", "InputFilesFromList" ])
+if jdl["JobType"] == "Reco":
+  jdls["mergeValidationReports" + jdl["JobType"]]["OutputDir"] = os.path.dirname(jdls["mergeValidationReports" + jdl["JobType"]]["OutputDir"])
 
 if args.parse or args.parse_only:
   for j in jdls:
