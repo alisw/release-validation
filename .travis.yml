@@ -6,8 +6,23 @@ python:
 install:
   - pip install jinja2
   - pip install codecov
+cache:
+  directories:
+    - $HOME/cctools
 script: |
   set -e
+  # Install cctools (cache installation)
+  export PATH="$HOME/cctools/bin:$PATH"
+  export LD_LIBRARY_PATH="$HOME/cctools/lib:$LD_LIBRARY_PATH"
+  if [[ ! -e $HOME/cctools/bin/makeflow ]]; then
+    pushd /tmp
+      curl -L http://ccl.cse.nd.edu/software/files/cctools-6.2.9-source.tar.gz | tar xzf -
+      cd cctools-*-source/
+      ./configure --prefix=$HOME/cctools && make -j4 && make install
+    popd
+  fi
+  type makeflow
+  # Actual test
   COV_REPORTS=
   pushd examples/
     for DIR in *; do
@@ -15,7 +30,22 @@ script: |
       pushd $DIR/
         echo ">> Testing JDL under $DIR"
         echo "dummy eos-proxy" > eos-proxy
-        coverage run ../../jdl2makeflow --remove --force --parse $DIR.jdl
+        echo 'EnvironmentCommand = "/bin/true";' >> ${DIR}_override.jdl
+        coverage run -a ../../jdl2makeflow --remove --force --parse $DIR.jdl
+        if [[ $DIR == reco ]]; then
+          # Create fake input files (needed for input box)
+          mkdir dummy
+          echo dummy file > dummy/file
+          tar cjf dummy.tar.bz2 dummy/
+          mkdir -p /tmp/relval/reco/alice/data/2017/LHC17r/000252858/cpass0_pass1/OCDB
+          cp dummy.tar.bz2 /tmp/relval/reco/alice/data/2017/LHC17r/000252858/cpass0_pass1/OCDB/OCDB.tar.bz2
+          mkdir -p /tmp/relval/reco/alice/data/2017/LHC17r/000252858/cpass0_pass1/ResidualMerge/TPCSPCalibration/CorrectionMaps
+          cp dummy.tar.bz2 /tmp/relval/reco/alice/data/2017/LHC17r/000252858/cpass0_pass1/ResidualMerge/TPCSPCalibration/CorrectionMaps/OCDB_SPC.tar.bz2
+          START_AT=mergeValidationReportsReco
+        elif [[ $DIR == gpmc ]]; then
+          START_AT=mergeValidationReportsMC
+        fi
+        [[ ! $START_AT ]] || coverage run -a ../../jdl2makeflow --remove --start-at $START_AT --run --dryrun $DIR.jdl
         coverage xml
         COV_REPORTS="$COV_REPORTS $PWD/coverage.xml"
       popd

@@ -2,6 +2,7 @@ jdl2makeflow
 ============
 
 [![PyPI version](https://badge.fury.io/py/alien-jdl2makeflow.svg)](https://badge.fury.io/py/alien-jdl2makeflow)
+[![Build Status](https://travis-ci.org/alisw/release-validation.svg?branch=master)](https://travis-ci.org/alisw/release-validation)
 [![codecov](https://codecov.io/gh/alisw/release-validation/branch/master/graph/badge.svg)](https://codecov.io/gh/alisw/release-validation)
 
 Run [AliEn](http://alien.web.cern.ch) JDLs on multiple platforms using
@@ -32,7 +33,7 @@ If you do not have root privileges:
     cd cctools-*-source/
     ./configure --prefix=$HOME/cctools && make -j10 && make install
     echo 'export PATH=$HOME/cctools/bin:$PATH' >> ~/.bashrc
-    echo 'export LD_LIBRARY_PATH=$HOME/cctools/bin:$LD_LIBRARY_PATH' >> ~/.bashrc
+    echo 'export LD_LIBRARY_PATH=$HOME/cctools/lib:$LD_LIBRARY_PATH' >> ~/.bashrc
 
 We are installing under `~/cctools` but you can use the directory you want.
 Also, we are assuming your shell configuration file is `~/.bashrc`, adjust it
