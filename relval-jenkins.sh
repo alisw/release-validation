@@ -136,7 +136,7 @@ function jira_relval_finished() {
   local JIRASUMMARY
   [[ $EXITCODE == 0 ]] && JIRASTATUS="*{color:green}success{color}*" \
                        || JIRASTATUS="*{color:red}errors{color}*"
-  [[ $EXITCODE == 0 ]] || JIRASUMMARY=" * [Errors summary|$DISPLAY_URL/validation_report_full.txt]\n"
+  [[ $EXITCODE == 0 ]] || JIRASUMMARY=" * Errors summary: [text|$DISPLAY_URL/validation_report_full.txt] | [HTML|$DISPLAY_URL/validation_report_full.html]\n"
   local TAGFMT='[~%s]'
   [[ $DONTMENTION == true ]] && TAGFMT='{{~%s}}'
 
@@ -179,7 +179,8 @@ X509_USER_PROXY = "\$PWD/eos-proxy";
 CONFIG_OCDB = "cvmfs";
 OCDB_PATH = "/cvmfs/alice-ocdb.cern.ch";
 MC_SEED = "1#alien_counter_04i#";
-ExtraVariables = { "X509_USER_PROXY", "CONFIG_OCDB", "OCDB_PATH", "MC_SEED" };
+RELVAL_DISPLAY_URL = "${OUTPUT_URL}/${RELVAL_NAME}/${JOB_TYPE}";
+ExtraVariables = { "X509_USER_PROXY", "CONFIG_OCDB", "OCDB_PATH", "MC_SEED", "RELVAL_DISPLAY_URL" };
 OutputDir_override = "${OUTPUT_XRD}/${RELVAL_NAME}/${JOB_TYPE}/#alien_counter_04i#";
 EnvironmentCommand = "export PACKAGES=\"$ALIENV_PKGS\"; export CVMFS_NAMESPACE=\"$CVMFS_NAMESPACE\"; source cvmfs_environment.sh; type aliroot";
 NoLiveOutput = 1;
@@ -200,7 +201,8 @@ X509_USER_PROXY = "\$PWD/eos-proxy";
 OCDB_PATH = "/cvmfs/alice-ocdb.cern.ch";
 EVENTS_PER_JOB = "$REC_LIMIT_EVENTS";
 ALIROOT_FORCE_COREDUMP = "1";
-ExtraVariables = { "X509_USER_PROXY", "OCDB_PATH", "EVENTS_PER_JOB", "ALIROOT_FORCE_COREDUMP" };
+RELVAL_DISPLAY_URL = "${OUTPUT_URL}/${RELVAL_NAME}/${JOB_TYPE}";
+ExtraVariables = { "X509_USER_PROXY", "OCDB_PATH", "EVENTS_PER_JOB", "ALIROOT_FORCE_COREDUMP", "RELVAL_DISPLAY_URL" };
 InputFile_override = { "eos-proxy", "cvmfs_environment.sh" };
 Output_append = { "core*", "validation_report.txt" };
 OutputDir_override = "${OUTPUT_XRD}/${RELVAL_NAME}/${JOB_TYPE}/#alien_counter_04i#";

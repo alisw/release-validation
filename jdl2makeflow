@@ -863,11 +863,11 @@ else:
 # Merge validation reports (common to all)
 jdls["mergeValidationReports" + jdl["JobType"]] = \
   get_preprocessed_jdl(args.jdl,
-    override={ "Output": [ "validation_report_full.txt" ],
+    override={ "Output": [ "validation_report_full.txt", "validation_report_full.html" ],
                "OutputDir": os.path.dirname(preprocess_var(jdl["OutputDir"], sh_mode=False)),
                "Executable": "merge_validation_reports.sh",
                "Arguments": "validation_report_list.txt",
-               "transferToMakeflow": "validation_report_full.txt"
+               "transferToMakeflow": "validation_report_full.txt validation_report_full.html"
              },
     append={ "InputFile": [ "merge_validation_reports.sh", "validation_report_list.txt,late" ],
              "JDLVariables": [ "transferToMakeflow" ] },

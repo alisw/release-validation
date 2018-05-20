@@ -205,7 +205,7 @@ node("$RUN_ARCH-relval") {
         # Define a unique name for the Release Validation
         RELVAL_NAME="${TAGS//=/-}-${RELVAL_TIMESTAMP}"
         RELVAL_NAME="${RELVAL_NAME// /_}"
-        OUTPUT_URL="https://ali-ci.cern.ch/release-validation/$RELVAL_NAME"
+        OUTPUT_URL="https://ali-ci.cern.ch/release-validation"
         OUTPUT_XRD="root://eospublic.cern.ch//eos/experiment/alice/release-validation/output"
         echo "Release Validation output on $OUTPUT_URL -- on XRootD: $OUTPUT_XRD"
 
@@ -289,12 +289,12 @@ node("$RUN_ARCH-relval") {
             echo "Job type was determined to be: ${JOB_TYPE}"
 
             # Start the Release Validation (notify on JIRA before and after)
-            jira_relval_started  "$JIRA_ISSUE" "$OUTPUT_URL/$JOB_TYPE" "${TAGS// /, }" "$DONT_MENTION" || true
+            jira_relval_started  "$JIRA_ISSUE" "$OUTPUT_URL/$RELVAL_NAME/$JOB_TYPE" "${TAGS// /, }" "$DONT_MENTION" || true
             set -x
             THIS_EXITCODE=0
             jdl2makeflow ${PARSE_ONLY_SWITCH} ${DRY_RUN_SWITCH} --remove --run "${THIS_JDL}.jdl" -T wq -N alirelval_${RELVAL_NAME} -r 3 -C wqcatalog.marathon.mesos:9097 || THIS_EXITCODE=$?
             set +x
-            jira_relval_finished "$JIRA_ISSUE" $THIS_EXITCODE "$OUTPUT_URL/$JOB_TYPE" "${TAGS// /, }" "$DONT_MENTION" || true
+            jira_relval_finished "$JIRA_ISSUE" $THIS_EXITCODE "$OUTPUT_URL/$RELVAL_NAME/$JOB_TYPE" "${TAGS// /, }" "$DONT_MENTION" || true
             [[ $THIS_EXITCODE == 0 ]] || EXITCODE=$THIS_EXITCODE  # propagate globally (will cause visible Jenkins error), but continue
           popd &> /dev/null
 
