@@ -31,7 +31,10 @@ script: |
         echo ">> Testing JDL under $DIR"
         echo "dummy eos-proxy" > eos-proxy
         echo 'EnvironmentCommand = "/bin/true";' >> ${DIR}_override.jdl
+        coverage run -a ../../jdl2makeflow --summary $DIR.jdl
+        coverage run -a ../../jdl2makeflow --parse-only $DIR.jdl
         coverage run -a ../../jdl2makeflow --remove --force --parse $DIR.jdl
+        touch work/dummy.done work/dummy.makeflowlog
         if [[ $DIR == reco ]]; then
           # Create fake input files (needed for input box)
           mkdir dummy
@@ -45,7 +48,7 @@ script: |
         elif [[ $DIR == gpmc ]]; then
           START_AT=mergeValidationReportsMC
         fi
-        [[ ! $START_AT ]] || coverage run -a ../../jdl2makeflow --remove --start-at $START_AT --run --dryrun $DIR.jdl
+        [[ ! $START_AT ]] || coverage run -a ../../jdl2makeflow --force --start-at $START_AT --run --dryrun $DIR.jdl
         coverage xml
         COV_REPORTS="$COV_REPORTS $PWD/coverage.xml"
       popd
