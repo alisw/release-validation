@@ -110,45 +110,43 @@ function eos_check_quota() {
 
 # Call this function to post a JIRA comment when the release validation starts.
 # Usage:
-#   jira_relval_started $JIRA_ISSUE $DISPLAY_URL $VERSIONS_STR $DONTMENTION
+#   jira_relval_started $JIRA_ISSUE $VERSIONS_STR $DONTMENTION
 function jira_relval_started() {
   local JIRA_ISSUE=$1
-  local DISPLAY_URL=$2
-  local VERSIONS_STR=$3
-  local DONTMENTION=$4
+  local VERSIONS_STR=$2
+  local DONTMENTION=$3
   jira_comment "$JIRA_ISSUE" \
                "Release validation for *${VERSIONS_STR} ($JOB_TYPE)* started.\n" \
                " * [Jenkins log|${BUILD_URL}/console]\n" \
-               " * [Validation output|${DISPLAY_URL}] (it might be still empty)\n"
+               " * [Validation output|${FULL_DISPLAY_PREFIX}] (it might be still empty)\n"
   [[ $DONTMENTION != true ]] && jira_watchers "$JIRA_ISSUE" "${JIRA_WATCHERS[@]}" || true
   return 0
 }
 
 # Call this function to post a JIRA comment when the release validation is done.
 # Usage:
-#   jira_relval_finished $JIRA_ISSUE $EXITCODE $DISPLAY_URL $VERSIONS_STR $DONTMENTION
+#   jira_relval_finished $JIRA_ISSUE $EXITCODE $VERSIONS_STR $DONTMENTION
 function jira_relval_finished() {
   local JIRA_ISSUE=$1
   local EXITCODE=$2
-  local DISPLAY_URL=$3
-  local VERSIONS_STR=$4
-  local DONTMENTION=$5
+  local VERSIONS_STR=$3
+  local DONTMENTION=$4
   local JIRASUMMARY
   [[ $EXITCODE == 0 ]] && JIRASTATUS="*{color:green}success{color}*" \
                        || JIRASTATUS="*{color:red}errors{color}*"
-  [[ $EXITCODE == 0 ]] || JIRASUMMARY=" * Errors summary: [text|$DISPLAY_URL/validation_report_full.txt] | [HTML|$DISPLAY_URL/validation_report_full.html]\n"
+  [[ $EXITCODE == 0 ]] || JIRASUMMARY=" * Errors summary: [text|$FULL_DISPLAY_PREFIX/validation_report_full.txt] | [HTML|$FULL_DISPLAY_PREFIX/validation_report_full.html]\n"
   local TAGFMT='[~%s]'
   [[ $DONTMENTION == true ]] && TAGFMT='{{~%s}}'
 
   local QAPLOTS
   [[ $JOB_TYPE == sim ]] \
-    && QAPLOTS="[QA plots|$DISPLAY_URL/QAplots_passMC]" \
-    || QAPLOTS="QA plots for [CPass1|$DISPLAY_URL/QAplots_CPass1] and [PPass|$DISPLAY_URL/QAplots_PPass]"
+    && QAPLOTS="[QA plots|$FULL_DISPLAY_PREFIX/QAplots_passMC]" \
+    || QAPLOTS="QA plots for [CPass1|$FULL_DISPLAY_PREFIX/cpass1_pass1/QAplots_CPass1] and [PPass|$FULL_DISPLAY_PREFIX/pass1/QAplots_PPass]"
 
   jira_comment "$JIRA_ISSUE"                                                                         \
     "Release validation for *${VERSIONS_STR} ($JOB_TYPE)* finished with ${JIRASTATUS}.\n"            \
     " * [Jenkins log|$BUILD_URL/console]\n"                                                          \
-    " * [Validation output|$DISPLAY_URL]\n"                                                          \
+    " * [Validation output|$FULL_DISPLAY_PREFIX]\n"                                                  \
     "$JIRASUMMARY"                                                                                   \
     " * ${QAPLOTS}\n"                                                                                \
     "\n"                                                                                             \
@@ -170,6 +168,8 @@ function preprocess_jdl() {
   if grep -q 'aliroot_dpgsim.sh' "$JDL_IN"; then
     # JDL belongs to a Monte Carlo
     JOB_TYPE=sim
+    FULL_OUTPUT_PREFIX="${OUTPUT_XRD}/${RELVAL_NAME}/${JOB_TYPE}"
+    FULL_DISPLAY_PREFIX="${OUTPUT_URL}/${RELVAL_NAME}/${JOB_TYPE}"
     cat <<EoF >> "$JDL_OUT"
 InputFile_append = { "eos-proxy", "cvmfs_environment.sh" };
 Split_override = "production:1-${SIM_NUM_JOBS}";
@@ -179,9 +179,9 @@ X509_USER_PROXY = "\$PWD/eos-proxy";
 CONFIG_OCDB = "cvmfs";
 OCDB_PATH = "/cvmfs/alice-ocdb.cern.ch";
 MC_SEED = "1#alien_counter_04i#";
-RELVAL_DISPLAY_URL = "${OUTPUT_URL}/${RELVAL_NAME}/${JOB_TYPE}";
+RELVAL_DISPLAY_URL = "${FULL_DISPLAY_PREFIX}";
 ExtraVariables = { "X509_USER_PROXY", "CONFIG_OCDB", "OCDB_PATH", "MC_SEED", "RELVAL_DISPLAY_URL" };
-OutputDir_override = "${OUTPUT_XRD}/${RELVAL_NAME}/${JOB_TYPE}/#alien_counter_04i#";
+OutputDir_override = "${FULL_OUTPUT_PREFIX}/#alien_counter_04i#";
 EnvironmentCommand = "export PACKAGES=\"$ALIENV_PKGS\"; export CVMFS_NAMESPACE=\"$CVMFS_NAMESPACE\"; source cvmfs_environment.sh; type aliroot";
 NoLiveOutput = 1;
 DontArchive = 1;
@@ -193,6 +193,8 @@ EoF
     local LHC_PERIOD=${LHC_PERIOD//\/}
     local RUN_NUMBER=$(head -n1 input_files.txt | grep -oE '/[0-9]{9}/')
     local RUN_NUMBER=$(( 10#${RUN_NUMBER//\/} ))
+    FULL_OUTPUT_PREFIX="${OUTPUT_XRD}/${RELVAL_NAME}/${JOB_TYPE}/alice/data/20${LHC_PERIOD:3:2}/${LHC_PERIOD}/$(printf "%09d" $RUN_NUMBER)"
+    FULL_DISPLAY_PREFIX="${OUTPUT_URL}/${RELVAL_NAME}/${JOB_TYPE}/alice/data/20${LHC_PERIOD:3:2}/${LHC_PERIOD}/$(printf "%09d" $RUN_NUMBER)"
     rm -f input_files.txt
     ln -nfs ../../datasets/$DATASET.txt input_files.txt
     ls -l input_files.txt
@@ -201,17 +203,17 @@ X509_USER_PROXY = "\$PWD/eos-proxy";
 OCDB_PATH = "/cvmfs/alice-ocdb.cern.ch";
 EVENTS_PER_JOB = "$REC_LIMIT_EVENTS";
 ALIROOT_FORCE_COREDUMP = "1";
-RELVAL_DISPLAY_URL = "${OUTPUT_URL}/${RELVAL_NAME}/${JOB_TYPE}";
+RELVAL_DISPLAY_URL = "${FULL_DISPLAY_PREFIX}";
 ALITPCDCALIBRES_LIST = "$(dirname $(head -n1 input_files.txt))/TPCSPCalibration/alitpcdcalibres.txt";
 ExtraVariables = { "X509_USER_PROXY", "OCDB_PATH", "EVENTS_PER_JOB", "ALIROOT_FORCE_COREDUMP", "RELVAL_DISPLAY_URL", "ALITPCDCALIBRES_LIST" };
 InputFile_override = { "eos-proxy", "cvmfs_environment.sh" };
 Output_append = { "core*", "validation_report.txt" };
-OutputDir_override = "${OUTPUT_XRD}/${RELVAL_NAME}/${JOB_TYPE}/alice/data/20${LHC_PERIOD:3:2}/${LHC_PERIOD}/$(printf "%09d" $RUN_NUMBER)/cpass0_pass1/#alienfilename/.root//#";
+OutputDir_override = "${FULL_OUTPUT_PREFIX}/cpass0_pass1/#alienfilename/.root//#";
 EnvironmentCommand = "export PACKAGES=\"$ALIENV_PKGS\"; export CVMFS_NAMESPACE=\"$CVMFS_NAMESPACE\"; source cvmfs_environment.sh; type aliroot";
 InputDataCollection_override = "input_files.txt";
 Packages = { $(for P in $ALIENV_PKGS; do echo \"$P\",; done)"" };
 SplitArguments_override = "$(dirname $(head -n1 input_files.txt))/#alienfilename# \$EVENTS_PER_JOB \$(( 10#\$(echo #alienfilename# | cut -b3-11) )) raw://";
-NoLiveOutput = 0;
+NoLiveOutput = 1;
 DontArchive = 1;
 LPMRunNumber = "$RUN_NUMBER";
 LPMAnchorRun = "$RUN_NUMBER";
