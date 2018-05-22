@@ -248,8 +248,8 @@ pushd $(dirname $DONEFILE) &> /dev/null
   [[ $ALIEN_JDL_TRANSFERTOMAKEFLOW ]] && touch $ALIEN_JDL_TRANSFERTOMAKEFLOW
 popd &> /dev/null
 {% else -%}
-# Make some files available to Makeflow directly too
-[[ $ALIEN_JDL_TRANSFERTOMAKEFLOW ]] && cp -v $ALIEN_JDL_TRANSFERTOMAKEFLOW $(dirname $DONEFILE)/
+# Make some files available to Makeflow directly too (non-fatal: let Makeflow catch errors later)
+[[ $ALIEN_JDL_TRANSFERTOMAKEFLOW ]] && cp -v $ALIEN_JDL_TRANSFERTOMAKEFLOW $(dirname $DONEFILE)/ || true
 {% endif -%}
 {{""}}
 # Compress output according to the output list
