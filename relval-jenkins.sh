@@ -206,7 +206,7 @@ ALITPCDCALIBRES_LIST = "$(dirname $(head -n1 input_files.txt))/TPCSPCalibration/
 ExtraVariables = { "X509_USER_PROXY", "OCDB_PATH", "EVENTS_PER_JOB", "ALIROOT_FORCE_COREDUMP", "RELVAL_DISPLAY_URL", "ALITPCDCALIBRES_LIST" };
 InputFile_override = { "eos-proxy", "cvmfs_environment.sh" };
 Output_append = { "core*", "validation_report.txt" };
-OutputDir_override = "${OUTPUT_XRD}/${RELVAL_NAME}/${JOB_TYPE}/#alien_counter_04i#";
+OutputDir_override = "${OUTPUT_XRD}/${RELVAL_NAME}/${JOB_TYPE}/alice/data/20${LHC_PERIOD:3:2}/${LHC_PERIOD}/$(printf "%09d" $RUN_NUMBER)/cpass0_pass1/#alienfilename/.root//#";
 EnvironmentCommand = "export PACKAGES=\"$ALIENV_PKGS\"; export CVMFS_NAMESPACE=\"$CVMFS_NAMESPACE\"; source cvmfs_environment.sh; type aliroot";
 InputDataCollection_override = "input_files.txt";
 Packages = { $(for P in $ALIENV_PKGS; do echo \"$P\",; done)"" };
