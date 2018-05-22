@@ -261,6 +261,7 @@ node("$RUN_ARCH-relval") {
           if [[ $PARSE_ONLY == true ]]; then
             PARSE_ONLY_SWITCH="--parse-only"
             JIRA_ISSUE=
+            SKIP_CHECK_FRAMEWORK="true"
           fi
 
           pushd release-validation/examples/$THIS_JDL &> /dev/null
