@@ -862,10 +862,14 @@ else:
   assert False, "should not happen: jdl[\"JobType\"] should be handled at this point"
 
 # Merge validation reports (common to all)
-jdls["mergeValidationReports" + jdl["JobType"]] = \
+mergeKey = "mergeValidationReports" + jdl["JobType"]
+mergeOutputDir = os.path.dirname(preprocess_var(jdl["OutputDir"], sh_mode=False))
+if jdl["JobType"] == "Reco":
+  mergeOutputDir = os.path.dirname(mergeOutputDir)
+jdls[mergeKey] = \
   get_preprocessed_jdl(args.jdl,
     override={ "Output": [ "validation_report_full.txt", "validation_report_full.html" ],
-               "OutputDir": os.path.dirname(preprocess_var(jdl["OutputDir"], sh_mode=False)),
+               "OutputDir": mergeOutputDir,
                "Executable": "merge_validation_reports.sh",
                "Arguments": "validation_report_list.txt",
                "transferToMakeflow": "validation_report_full.txt validation_report_full.html"
@@ -873,8 +877,8 @@ jdls["mergeValidationReports" + jdl["JobType"]] = \
     append={ "InputFile": [ "merge_validation_reports.sh", "validation_report_list.txt,late" ],
              "JDLVariables": [ "transferToMakeflow" ] },
     delete=[ "JobRange", "InputFilesFromList" ])
-if jdl["JobType"] == "Reco":
-  jdls["mergeValidationReports" + jdl["JobType"]]["OutputDir"] = os.path.dirname(jdls["mergeValidationReports" + jdl["JobType"]]["OutputDir"])
+del mergeKey
+del mergeOutputDir
 
 if args.parse or args.parse_only:
   for j in jdls:
