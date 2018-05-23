@@ -16,7 +16,7 @@ grep -qE '^E-ProcessOutput:' ocdb.log &> /dev/null \
 [[ $ALITPCDCALIBRES_LIST ]] || { echo "Cannot rerun as external list \$ALITPCDCALIBRES_LIST was not set"; exit 1; }
 
 echo "Faking run by using external list $ALITPCDCALIBRES_LIST"
-mv ocdb.log ocdb_firstrun.log
+mv ocdb.log ocdb.log.old
 rm -f alitpcdcalibres.txt
 cat > copyHere.C <<EOF
 void copyHere() {

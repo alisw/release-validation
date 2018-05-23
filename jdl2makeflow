@@ -643,7 +643,7 @@ elif jdl["JobType"] == "Reco":
   # cpass0SpCalib
   jdls["cpass0SpCalib"] = \
     get_preprocessed_jdl(args.jdl,
-      override={ "Output": [ "log_archive.zip:*.log,*.list@disk=2",
+      override={ "Output": [ "log_archive.zip:*.log,*.list,*.log.old@disk=2",
                              "validation_report.txt",
                              "OCDB_SPC.tar.bz2",
                              "core*" ],
