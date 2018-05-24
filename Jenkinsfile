@@ -67,7 +67,7 @@ else {
           pushd "$PKG/"
             if [[ $PKG == AliDPG ]]; then
               DPGBRANCH="${VER%-XX-*}"
-              [[ $DPGBRANCH == $VER ]] \
+              [[ $DPGBRANCH == $VER || $DPGBRANCH == 'v9-99' ]] \
                 && { echo "Cannot determine AliDPG branch to tag from $VER: assuming master"; DPGBRANCH=master; } \
                 || DPGBRANCH="${DPGBRANCH}-XX"
               git checkout "$DPGBRANCH"
