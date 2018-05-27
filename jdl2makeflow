@@ -236,7 +236,7 @@ $PROG $ARGS $*  > >(tee -a stdout.log{% if no_live_out %} &> /dev/null{% endif %
 
 # Produce validation report
 touch validation_report.txt
-grep -a -H -n -E 'File name too long|std::bad_alloc|Segmentation violation|Segmentation fault|Bus error|floating point exception|E-ProcessOutput:|Killed|busy flag cleared|Cannot Build the PAR Archive|\\*\\*\\* glibc detected \\*\\*\\*|E-AliCDBGrid::PutEntry:|F-AliCDBGrid::|E-TAlienFile::ReadBuffer: The remote \\(removed\\) file is not open' *.log > validation_report.txt 2> /dev/null || true
+grep -a -H -n -E 'Merged 0 files|File name too long|std::bad_alloc|Segmentation violation|Segmentation fault|Bus error|floating point exception|E-ProcessOutput:|Killed|busy flag cleared|Cannot Build the PAR Archive|\\*\\*\\* glibc detected \\*\\*\\*|E-AliCDBGrid::PutEntry:|F-AliCDBGrid::|E-TAlienFile::ReadBuffer: The remote \\(removed\\) file is not open' *.log > validation_report.txt 2> /dev/null || true
 for CORE in core*; do
   [[ -e $CORE ]] || continue
   echo "$CORE:0:core dumped"
