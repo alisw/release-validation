@@ -144,7 +144,7 @@ function jira_relval_finished() {
     || QAPLOTS="QA plots for [CPass1|$FULL_DISPLAY_PREFIX/cpass1_pass1/QAplots_CPass1] and [PPass|$FULL_DISPLAY_PREFIX/pass1/QAplots_PPass]"
 
   jira_comment "$JIRA_ISSUE"                                                                         \
-    "Release validation for *${VERSIONS_STR} ($JOB_TYPE)* finished: ${JIRASTATUS}.\n"            \
+    "Release validation for *${VERSIONS_STR} ($JOB_TYPE)* finished: ${JIRASTATUS}.\n"                \
     " * [Jenkins log|$BUILD_URL/console]\n"                                                          \
     " * [Validation output|$FULL_DISPLAY_PREFIX]\n"                                                  \
     "$JIRASUMMARY"                                                                                   \
@@ -153,8 +153,13 @@ function jira_relval_finished() {
     "Contact persons for detectors and components:\n"                                                \
     "$(for D in "${DETECTORS[@]}"; do
          printf " * ${D%%:*}:"; for R in ${D#*:}; do printf " $TAGFMT" "$R"; done; echo -n "\n"
-       done)"
-   return 0
+       done)\n"                                                                                      \
+    "Check output on lxplus using the same software environment:\n"                                  \
+    "{code}\n"                                                                                       \
+    "/cvmfs/${CVMFS_NAMESPACE}.cern.ch/bin/alienv enter ${ALIENV_PKGS}\n"                            \
+    "cd ${FULL_OUTPUT_PREFIX/root://eospublic.cern.ch}\n"                                            \ 
+    "{code}\n"
+  return 0
 }
 
 # Function to preprocess the JDL with Jenkins parameters. Also sets global
