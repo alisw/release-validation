@@ -188,6 +188,9 @@ DontArchive = 1;
 EoF
   elif grep -q '/aliroot_dpg' "$JDL_IN"; then
     # JDL belongs to a Reconstruction
+    rm -f input_files.txt
+    ln -nfs ../../datasets/$DATASET.txt input_files.txt
+    ls -l input_files.txt
     JOB_TYPE=rec
     local LHC_PERIOD=$(head -n1 input_files.txt | grep -oE '/LHC[0-9]{2}[^/]/')
     local LHC_PERIOD=${LHC_PERIOD//\/}
@@ -195,9 +198,6 @@ EoF
     local RUN_NUMBER=$(( 10#${RUN_NUMBER//\/} ))
     FULL_OUTPUT_PREFIX="${OUTPUT_XRD}/${RELVAL_NAME}/${JOB_TYPE}/alice/data/20${LHC_PERIOD:3:2}/${LHC_PERIOD}/$(printf "%09d" $RUN_NUMBER)"
     FULL_DISPLAY_PREFIX="${OUTPUT_URL}/${RELVAL_NAME}/${JOB_TYPE}/alice/data/20${LHC_PERIOD:3:2}/${LHC_PERIOD}/$(printf "%09d" $RUN_NUMBER)"
-    rm -f input_files.txt
-    ln -nfs ../../datasets/$DATASET.txt input_files.txt
-    ls -l input_files.txt
     cat <<EoF >> "$JDL_OUT"
 X509_USER_PROXY = "\$PWD/eos-proxy";
 OCDB_PATH = "/cvmfs/alice-ocdb.cern.ch";

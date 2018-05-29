@@ -301,8 +301,8 @@ node("$RUN_ARCH-relval") {
 
             # Start the Release Validation (notify on JIRA before and after)
             jira_relval_started  "$JIRA_ISSUE" "${TAGS// /, }" "$DONT_MENTION" || true
-            set -x
             THIS_EXITCODE=0
+            set -x
             jdl2makeflow ${PARSE_ONLY_SWITCH} ${DRY_RUN_SWITCH} ${START_AT:+--start-at $START_AT} --remove --run "${THIS_JDL}.jdl" -T wq -N alirelval_${RELVAL_NAME} -r 3 -C wqcatalog.marathon.mesos:9097 || THIS_EXITCODE=$?
             set +x
             jira_relval_finished "$JIRA_ISSUE" $THIS_EXITCODE "${TAGS// /, }" "$DONT_MENTION" || true
