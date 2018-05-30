@@ -35,6 +35,9 @@ script: |
         coverage run -a ../../jdl2makeflow --parse-only $DIR.jdl
         coverage run -a ../../jdl2makeflow --remove --force --parse $DIR.jdl
         touch work/dummy.done work/dummy.makeflowlog
+        START_AT=
+        STOP_AT=
+        WRONG_START_STOP=
         if [[ $DIR == reco ]]; then
           # Create fake input files (needed for input box)
           mkdir dummy
@@ -44,11 +47,27 @@ script: |
           cp dummy.tar.bz2 /tmp/relval/reco/alice/data/2017/LHC17r/000252858/cpass0_pass1/OCDB/OCDB.tar.bz2
           mkdir -p /tmp/relval/reco/alice/data/2017/LHC17r/000252858/cpass0_pass1/ResidualMerge/TPCSPCalibration/CorrectionMaps
           cp dummy.tar.bz2 /tmp/relval/reco/alice/data/2017/LHC17r/000252858/cpass0_pass1/ResidualMerge/TPCSPCalibration/CorrectionMaps/OCDB_SPC.tar.bz2
-          START_AT=mergeValidationReportsReco
+          START_AT=ppassQaPlots
+          STOP_AT=mergeValidationReportsReco
+          WRONG_START_STOP=('--start-at cpass1Merge --stop-at cpass0'
+                            '--start-at simQaPlots'
+                            '--stop-at simQaMerge')
         elif [[ $DIR == gpmc ]]; then
-          START_AT=mergeValidationReportsMC
+          START_AT=simQaPlots
+          STOP_AT=mergeValidationReportsMC
+          WRONG_START_STOP=('--start-at simQaPlots --stop-at sim'
+                            '--start-at cpass0Merge'
+                            '--stop-at cpass1')
         fi
-        [[ ! $START_AT ]] || coverage run -a ../../jdl2makeflow --force --start-at $START_AT --run --dryrun $DIR.jdl
+        if [[ $START_AT ]]; then
+          coverage run -a ../../jdl2makeflow --force --start-at $START_AT --stop-at $STOP_AT --run --dryrun $DIR.jdl
+          for W in "${WRONG_START_STOP[@]}"; do
+            echo "Testing wrong arguments: $W"
+            ERR=0
+            coverage run -a ../../jdl2makeflow --remove $W $DIR.jdl || ERR=$?
+            [[ $ERR == 1 ]] || { echo "Should have failed with 1 but it exited with $ERR"; exit 1; }
+          done
+        fi
         coverage xml
         COV_REPORTS="$COV_REPORTS $PWD/coverage.xml"
       popd
