@@ -14,30 +14,31 @@ from glob import glob
 lib_path = os.path.abspath(os.path.dirname(jdl2makeflow_helpers.__file__))
 
 # Tiers definition of stages for MC and for Reco. Jobs on each tier can be executed in parallel
-stages_mc = [ [ "sim" ],
-              [ "simResMerge", "simQaMerge" ],
-              [ "simQaPlots" ],
-              [ "mergeValidationReportsMC" ] ]
-stages_reco = [
-                # CPass0
-                [ "cpass0" ],
-                [ "cpass0Merge", "cpass0ResMerge" ],
-                [ "cpass0SpBins" ],
-                [ "cpass0SpDistMaps" ],
-                [ "cpass0SpCalib" ],
-                # CPass1
-                [ "cpass1" ],
-                [ "cpass1Merge", "cpass1ResMerge" ],
-                [ "cpass1QaMerge" ],
-                [ "cpass1QaPlots" ],
-                # PPass
-                [ "ppass" ],
-                [ "ppassQaMerge", "ppassResMerge" ],
-                [ "ppassQaPlots" ],
-                # Validation reports
-                [ "mergeValidationReportsReco" ]
-              ]
-stages_flat = [ y for x in stages_mc+stages_reco for y in x  ]
+stages_sim = [ [ "sim" ],
+               [ "simResMerge", "simQaMerge" ],
+               [ "simQaPlots" ],
+               [ "mergeValidationReportsMC" ]
+             ]
+stages_rec = [
+               # CPass0
+               [ "cpass0" ],
+               [ "cpass0Merge", "cpass0ResMerge" ],
+               [ "cpass0SpBins" ],
+               [ "cpass0SpDistMaps" ],
+               [ "cpass0SpCalib" ],
+               # CPass1
+               [ "cpass1" ],
+               [ "cpass1Merge", "cpass1ResMerge" ],
+               [ "cpass1QaMerge" ],
+               [ "cpass1QaPlots" ],
+               # PPass
+               [ "ppass" ],
+               [ "ppassQaMerge", "ppassResMerge" ],
+               [ "ppassQaPlots" ],
+               # Validation reports
+               [ "mergeValidationReportsReco" ]
+             ]
+stages_flat = [ y for x in stages_sim+stages_rec for y in x  ]
 
 ap = ArgumentParser()
 ap.add_argument("--dryrun", "-n", dest="dry_run", default=None, action="store_true",
@@ -457,11 +458,11 @@ stages = None
 jdl = get_preprocessed_jdl(args.jdl)
 if jdl["JobType"] == "MC":
   all_inputs["sim"] = jdl["InputFile"]
-  stages = stages_mc
+  stages = stages_sim
   steps = [ "MCPass" ]
 elif jdl["JobType"] == "Reco":
   all_inputs["cpass0"] = jdl["InputFile"]
-  stages = stages_reco
+  stages = stages_rec
   steps = [ "CPass0", "CPass0_SPC", "CPass1", "PPass" ]
 else:
   print("Cannot recognize job type, only MC and Reco are supported")
@@ -1187,8 +1188,8 @@ validation_report_full.txt {{ "mergeValidationReportsReco"|job_head }} ppassQaPl
   with open(os.path.join(args.work_dir, "Makeflow_"+step), "w") as mf:
     mf.write(makeflow.render(jdls=jdls,
                              step=step,
-                             joba= jdl["JobRange"][0],
-                             jobb= jdl["JobRange"][1]+1))
+                             joba=jdl["JobRange"][0],
+                             jobb=jdl["JobRange"][1]+1))
 
   if args.graph:
     print("Generating graph for step %s" % step)
