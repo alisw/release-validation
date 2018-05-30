@@ -38,7 +38,7 @@ stages_rec = [
                # Validation reports
                [ "mergeValidationReportsReco" ]
              ]
-stages_flat = [ y for x in stages_sim+stages_rec for y in x  ]
+all_stages_flat = [ y for x in stages_sim+stages_rec for y in x  ]
 
 ap = ArgumentParser()
 ap.add_argument("--dryrun", "-n", dest="dry_run", default=None, action="store_true",
@@ -51,15 +51,16 @@ ap.add_argument("--parse-only", "-p", dest="parse_only", default=False, action="
                 help="Only show JDLs in JSON format and quit")
 ap.add_argument("--summary", "-s", dest="summary", default=False, action="store_true",
                 help="Only show summary without creating any file and exit")
-ap.add_argument("--start-at", "-t", dest="start_at", default=None,
-                choices=stages_flat,
-                help="Start at the defined stage, assuming the previous stages were successful")
+ap.add_argument("--start-at", dest="start_at", default=None, choices=all_stages_flat,
+                help="Start at the defined stage, assuming previous stages were successful")
+ap.add_argument("--stop-at", dest="stop_at", default=None, choices=all_stages_flat,
+                help="Stop at the defined stage")
 ap.add_argument("--force", dest="force", default=False, action="store_true",
                 help="Proceed even if working directory exists (you may lose files!)")
 ap.add_argument("--remove", dest="remove", default=False, action="store_true",
                 help="Force removal of working directory (you will lose files!)")
 ap.add_argument("--graph", dest="graph", default=False, action="store_true",
-                help="Create dependency graph as Makeflow.pdf in the workdir")
+                help="Create dependency graphs as Makeflow_<step>.pdf in the workdir")
 ap.add_argument("--run", "-r", dest="run", default=False, action="store_true",
                 help="Automatically run workflow after generating the manifest")
 ap.add_argument("jdl",
@@ -466,6 +467,33 @@ elif jdl["JobType"] == "Reco":
   steps = [ "CPass0", "CPass0_SPC", "CPass1", "PPass" ]
 else:
   print("Cannot recognize job type, only MC and Reco are supported")
+  exit(1)
+
+# Flatten the list of stages with an order apt for checking it against stop_at
+stages_flat = []
+for s in stages:
+  if args.stop_at in s:
+    s = [args.stop_at] + [x for x in s if x != args.stop_at]
+  stages_flat.extend(s)
+if not args.stop_at:
+  args.stop_at = stages_flat[-1]
+
+# Check if start_at is appropriate considering the job type
+if args.start_at and not args.start_at in stages_flat:
+  print("Cannot start at step \"%s\" as it is not part of job type %s" % \
+    (args.start_at, jdl["JobType"]))
+  exit(1)
+
+# Check if stop_at is appropriate considering the job type
+if not args.stop_at in stages_flat:
+  print("Cannot stop at step \"%s\" as it is not part of job type %s" % \
+    (args.stop_at, jdl["JobType"]))
+  exit(1)
+
+# Check if stop_at is greater than start_at
+if args.start_at and (stages_flat.index(args.start_at) > stages_flat.index(args.stop_at)):
+  print("Step \"%s\" comes before starting step \"%s\", cannot stop at it" % \
+    (args.stop_at, args.start_at))
   exit(1)
 
 # All JDLs are here. Dictionary whose labels are the stages defined above
@@ -1073,8 +1101,8 @@ for step in steps:
 
   # Remove validation report if appropriate
   vf = os.path.join(args.work_dir, "validation_report_full.txt")
-  idx = max([ stages_flat.index(x) for x in stages_flat if x.startswith("mergeValidationReports") ])
-  if os.path.isfile(vf) and args.run and (not args.start_at or stages_flat.index(args.start_at) <= idx):
+  idx = max([ all_stages_flat.index(x) for x in all_stages_flat if x.startswith("mergeValidationReports") ])
+  if os.path.isfile(vf) and args.run and (not args.start_at or all_stages_flat.index(args.start_at) <= idx):
     os.remove(vf)
 
   print("Generating Makeflow_%s" % step)
@@ -1082,112 +1110,155 @@ for step in steps:
 # Makeflow_{{step}} -- automatically generated
 
 {% if step == "MCPass" %}
+{% if do_stage("sim") %}
 # sim
 {% for jobindex in range(joba,jobb) -%}
 {{ "sim"|job_head(index=jobindex) }}
 {{ "sim"|job_cmd(index=jobindex) }}
 {% endfor %}
+{% endif %}
 
+{% if do_stage("simResMerge") %}
 # simResMerge
 {{ "simResMerge"|job_head }}{% for j in range(joba,jobb) %}{{ " sim%04d.done"|format(j) }}{% endfor %}
 {{ "simResMerge"|job_cmd }}
+{% endif %}
 
+{% if do_stage("simQaMerge") %}
 # simQaMerge
 {{ "simQaMerge"|job_head }}{% for j in range(joba,jobb) %}{{ " sim%04d.done"|format(j) }}{% endfor %}
 {{ "simQaMerge"|job_cmd }}
+{% endif %}
 
+{% if do_stage("simQaPlots") %}
 # simQaPlots
 {{ "simQaPlots"|job_head }} simQaMerge.done
 {{ "simQaPlots"|job_cmd }}
+{% endif %}
 
+{% if do_stage("mergeValidationReportsMC") %}
 # mergeValidationReportsMC
 validation_report_full.txt {{ "mergeValidationReportsMC"|job_head }} simQaPlots.done
 {{ "mergeValidationReportsMC"|job_cmd }}
 {% endif %}
+{% endif %}
 
 {% if step == "CPass0" %}
+{% if do_stage("cpass0") %}
 # cpass0
 {% for jobindex in range(joba,jobb) -%}
 {{ "cpass0"|job_head(index=jobindex) }}
 {{ "cpass0"|job_cmd(index=jobindex) }}
 {% endfor %}
+{% endif %}
 
+{% if do_stage("cpass0Merge") %}
 # cpass0Merge
 {{ "cpass0Merge"|job_head }}{% for j in range(joba,jobb) %}{{ " cpass0%04d.done"|format(j) }}{% endfor %}
 {{ "cpass0Merge"|job_cmd }}
+{% endif %}
 
+{% if do_stage("cpass0ResMerge") %}
 # cpass0ResMerge
 {{ "cpass0ResMerge"|job_head }}{% for j in range(joba,jobb) %}{{ " cpass0%04d.done"|format(j) }}{% endfor %}
 {{ "cpass0ResMerge"|job_cmd }}
+{% endif %}
 
+{% if do_stage("cpass0SpBins") %}
 # cpass0SpBins
 timeBins.log {{ "cpass0SpBins"|job_head }} cpass0Merge.done cpass0ResMerge.done
 {{ "cpass0SpBins"|job_cmd }}
 {% endif %}
+{% endif %}
 
 {% if step == "CPass0_SPC" %}
+{% if do_stage("cpass0SpDistMaps") %}
 # cpass0SpDistMaps
 {% for jobindex in range(0,jdls["cpass0SpDistMaps"]["timeBins"]|length) %}
 {{ "cpass0SpDistMaps"|job_head(index=jobindex) }} cpass0SpBins.done
 {{ "cpass0SpDistMaps"|job_cmd(index=jobindex) }} {{ jdls["cpass0SpDistMaps"]["timeBins"][jobindex] }}
 {% endfor %}
+{% endif %}
 
+{% if do_stage("cpass0SpCalib") %}
 # cpass0SpCalib
 {{ "cpass0SpCalib"|job_head }}{% for j in range(0,jdls["cpass0SpDistMaps"]["timeBins"]|length) %}{{ " cpass0SpDistMaps%04d.done"|format(j) }}{% endfor %}
 {{ "cpass0SpCalib"|job_cmd }}
 {% endif %}
+{% endif %}
 
 {% if step == "CPass1" %}
+{% if do_stage("cpass1") %}
 # cpass1
 {% for jobindex in range(joba,jobb) -%}
 {{ "cpass1"|job_head(index=jobindex) }} cpass0SpCalib.done
 {{ "cpass1"|job_cmd(index=jobindex) }}
 {% endfor %}
+{% endif %}
 
+{% if do_stage("cpass1Merge") %}
 # cpass1Merge
 {{ "cpass1Merge"|job_head }}{% for j in range(joba,jobb) %}{{ " cpass1%04d.done"|format(j) }}{% endfor %}
 {{ "cpass1Merge"|job_cmd }}
+{% endif %}
 
+{% if do_stage("cpass1ResMerge") %}
 # cpass1ResMerge
 {{ "cpass1ResMerge"|job_head }}{% for j in range(joba,jobb) %}{{ " cpass1%04d.done"|format(j) }}{% endfor %}
 {{ "cpass1ResMerge"|job_cmd }}
+{% endif %}
 
+{% if do_stage("cpass1QaMerge") %}
 # cpass1QaMerge
 {{ "cpass1QaMerge"|job_head }} cpass1Merge.done
 {{ "cpass1QaMerge"|job_cmd }}
+{% endif %}
 
+{% if do_stage("cpass1QaPlots") %}
 # cpass1QaPlots
 {{ "cpass1QaPlots"|job_head }} cpass1QaMerge.done
 {{ "cpass1QaPlots"|job_cmd }}
 {% endif %}
+{% endif %}
 
 {% if step == "PPass" %}
+{% if do_stage("ppass") %}
 # ppass
 {% for jobindex in range(joba,jobb) -%}
 {{ "ppass"|job_head(index=jobindex) }} cpass1Merge.done
 {{ "ppass"|job_cmd(index=jobindex) }}
 {% endfor %}
+{% endif %}
 
+{% if do_stage("ppassResMerge") %}
 # ppassResMerge
 {{ "ppassResMerge"|job_head }}{% for j in range(joba,jobb) %}{{ " ppass%04d.done"|format(j) }}{% endfor %}
 {{ "ppassResMerge"|job_cmd }}
+{% endif %}
 
+{% if do_stage("ppassQaMerge") %}
 # ppassQaMerge
 {{ "ppassQaMerge"|job_head }}{% for j in range(joba,jobb) %}{{ " ppass%04d.done"|format(j) }}{% endfor %}
 {{ "ppassQaMerge"|job_cmd }}
+{% endif %}
 
+{% if do_stage("ppassQaPlots") %}
 # ppassQaPlots
 {{ "ppassQaPlots"|job_head }} ppassQaMerge.done
 {{ "ppassQaPlots"|job_cmd }}
+{% endif %}
 
+{% if do_stage("mergeValidationReportsReco") %}
 # mergeValidationReportsReco
 validation_report_full.txt {{ "mergeValidationReportsReco"|job_head }} ppassQaPlots.done
 {{ "mergeValidationReportsReco"|job_cmd }}
+{% endif %}
 {% endif %}
 """)
   with open(os.path.join(args.work_dir, "Makeflow_"+step), "w") as mf:
     mf.write(makeflow.render(jdls=jdls,
                              step=step,
+                             do_stage=lambda stage: stages_flat.index(stage) <= stages_flat.index(args.stop_at),
                              joba=jdl["JobRange"][0],
                              jobb=jdl["JobRange"][1]+1))
 
