@@ -93,7 +93,7 @@ else {
         ALIBUILD_BRANCH="${ALIBUILD##*:}"
         ALIBUILD_REPO="${ALIBUILD%:*}"
         [[ $ALIBUILD_BRANCH == $ALIBUILD ]] && ALIBUILD_BRANCH= || true
-        export PYTHONUSERBASE="$PWD/python"
+        export PYTHONUSERBASE="$PWD/local_python"
         export PATH="$PYTHONUSERBASE/bin:$PATH"
         rm -rf "$PYTHONUSERBASE"
         pip install --user "git+https://github.com/$ALIBUILD_REPO${ALIBUILD_BRANCH:+"@$ALIBUILD_BRANCH"}"
@@ -232,9 +232,9 @@ node("$RUN_ARCH-relval") {
         [[ $RELVAL_BRANCH == $RELVAL ]] && RELVAL_BRANCH= || true
         rm -rf release-validation/
         git clone --depth 1 "https://github.com/$RELVAL_REPO" ${RELVAL_BRANCH:+-b "$RELVAL_BRANCH"} release-validation/
-        export PYTHONUSERBASE=$PWD/python
+        export PYTHONUSERBASE=$PWD/local_python
         export PATH=$PYTHONUSERBASE/bin:$PATH
-        rm -rf python && mkdir python
+        rm -rf "$PYTHONUSERBASE" && mkdir "$PYTHONUSERBASE"
         pip install --user release-validation/
 
         # Copy credentials and check validity (assume they are under /secrets). Credentials should
