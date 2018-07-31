@@ -65,6 +65,7 @@ for t in sys.argv[2:]:
   defaults["overrides"][pkg]["tag"] = tag
 with open(fn, "w") as fp:
   fp.write(yaml.dump(defaults, default_flow_style=False))
+  fp.write(chr(10)+"---"+chr(10))
 EOF
       chmod +x alidist-override-tags.py
       '''
