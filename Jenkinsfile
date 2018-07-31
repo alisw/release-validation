@@ -42,7 +42,33 @@ else {
 
     stage "Tagging"
     withEnv(["TAGS=$TAGS",
-             "ALIDIST=$ALIDIST"]) {
+             "ALIDIST=$ALIDIST",
+             "DEFAULTS=$DEFAULTS"]) {
+
+      sh '''
+      set -e
+      set -o pipefail
+      cat > alidist-override-tags.py <<EOF
+#!/usr/bin/env python
+# Usage: alidist-override-tags.py alidist/defaults-blah.sh AliRoot=v123 AliPhysics=v456...
+from __future__ import print_function
+import yaml, sys
+fn = sys.argv[1]  # path to the defaults file
+with open(fn) as fp:
+  defaults = yaml.safe_load(fp.read().split("---", 1)[0])
+for t in sys.argv[2:]:
+  pkg,tag = t.split("=", 1)
+  if not "overrides" in defaults:
+    defaults["overrides"] = {}
+  if not pkg in defaults["overrides"]:
+    defaults["overrides"][pkg] = {}
+  defaults["overrides"][pkg]["tag"] = tag
+with open(fn, "w") as fp:
+  fp.write(yaml.dump(defaults, default_flow_style=False))
+EOF
+      chmod +x alidist-override-tags.py
+      '''
+
       sh '''
         set -e
         set -o pipefail
@@ -59,8 +85,11 @@ else {
           REPO=$(cat alidist/"$PKGLOW".sh | grep '^source:' | head -n1)
           REPO=${REPO#*:}
           REPO=$(echo $REPO)
-          sed -e "s/tag:.*/tag: $VER/" "alidist/$PKGLOW.sh" > "alidist/$PKGLOW.sh.0"
-          mv "alidist/$PKGLOW.sh.0" "alidist/$PKGLOW.sh"
+
+          # Use embedded Python script to override tags using aliBuild defaults
+          ./alidist-override-tags.py alidist/defaults-${DEFAULTS:-release}.sh $TAGS
+          ( cd alidist && git diff )
+
           git ls-remote --tags "$REPO" | grep "refs/tags/$VER\\$" && { echo "Tag $VER on $PKG exists - skipping"; continue; } || true
           rm -rf "$PKG/"
           git clone $([[ -d /build/mirror/$PKGLOW ]] && echo "--reference /build/mirror/$PKGLOW") "$REPO" "$PKG/"
