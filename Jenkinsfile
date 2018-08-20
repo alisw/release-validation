@@ -68,6 +68,7 @@ with open(fn, "w") as fp:
   fp.write(chr(10)+"---"+chr(10))
 EOF
       chmod +x alidist-override-tags.py
+      python -c 'import yaml' 2> /dev/null || pip install pyyaml
       '''
 
       sh '''
