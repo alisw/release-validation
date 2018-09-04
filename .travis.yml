@@ -22,6 +22,13 @@ script: |
     popd
   fi
   type makeflow
+  # Test datasets consistency
+  pushd datasets/
+    for DS in *.txt; do
+      echo ">> Testing validity of dataset $DS"
+      grep -vE '^root://.*\.root$' $DS || continue && { echo ">> Dataset $DS not OK, see the corrupted lines above"; exit 1; }
+    done
+  popd
   # Actual test
   COV_REPORTS=
   pushd examples/
