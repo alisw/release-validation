@@ -4,22 +4,22 @@ JobTag = {
 };
 Packages = {
 "VO_ALICE@AliDPG::v5-09-XX-27",
-"VO_ALICE@AliPhysics::v5-09-18-01-1",
+"VO_ALICE@AliPhysics::v5-09-36-01-1",
 "VO_ALICE@jemalloc::v3.6.0"
 };
 Executable = "/alice/cern.ch/user/a/aliprod/bin/aliroot_dpgsim.sh";
 InputFile = {
 "LF:/alice/cern.ch/user/a/aliprod/LHC17l5/Custom.cfg",
-"LF:/alice/sim/2017/LHC17l5/OCDB/279880/OCDBsim.root",
-"LF:/alice/sim/2017/LHC17l5/OCDB/279880/OCDBrec.root"
+"LF:/alice/sim/2017/LHC17l5/OCDB/280140/OCDBsim.root",
+"LF:/alice/sim/2017/LHC17l5/OCDB/280140/OCDBrec.root"
 };
 Split = "production:1-244";
-SplitArguments = "--run 279880 --mode full --uid #alien_counter# --nevents 400 --generator Pythia8_Monash2013 --trigger Custom.cfg";
+SplitArguments = "--run 280140 --mode full --uid #alien_counter# --nevents 400 --generator Pythia8_Monash2013 --trigger Custom.cfg";
 JDLPath = "/alice/cern.ch/user/a/aliprod/LHC17l5/JDL2";
-JDLArguments = "279880 0 244 0 0 0";
+JDLArguments = "280140 0 244 0 0 0";
 JDLProcessor = "alien.lpm.RunList";
 ValidationCommand = "/alice/validation/validation.sh";
-OutputDir = "/alice/sim/2017/LHC17l5/279880/#alien_counter_03i#";
+OutputDir = "/alice/sim/2017/LHC17l5/280140/#alien_counter_03i#";
 Output = {
 "log_archive:stderr.log,stdout.log,tag.log,sim.log,rec.log,qa.log,aod.log,simwatch.log,check.log,recwatch.log@disk=1",
 "root_archive.zip:pyxsec.root,galice.root,Kinematics.root,TrackRefs.root,Trigger.root,AliESDs.root,AliESDfriends.root,Run*.root@disk=1",
@@ -30,7 +30,7 @@ Output = {
 OutputErrorE = {
 "log_archive.zip:*.log@disk=1"
 };
-Requirements = ( member(other.Packages,"VO_ALICE@AliDPG::v5-09-XX-27") ) && ( member(other.Packages,"VO_ALICE@AliPhysics::v5-09-18-01-1") ) && ( member(other.Packages,"VO_ALICE@jemalloc::v3.6.0") ) && ( other.TTL > 72000 ) && ( other.Price <= 10 );
+Requirements = ( member(other.Packages,"VO_ALICE@AliDPG::v5-09-XX-27") ) && ( member(other.Packages,"VO_ALICE@AliPhysics::v5-09-36-01-1") ) && ( member(other.Packages,"VO_ALICE@jemalloc::v3.6.0") ) && ( other.TTL > 72000 ) && ( other.Price <= 10 );
 TTL = 72000;
 Price = 10.0;
 MemorySize = "8GB";
@@ -54,12 +54,12 @@ JDLVariables = {
 "LPMJobTypeID"
 };
 LPMAnchorPassName = "pass1";
-LPMMetaData = "Packages=[VO_ALICE@AliDPG::v5-09-XX-27, VO_ALICE@AliPhysics::v5-09-18-01-1, VO_ALICE@jemalloc::v3.6.0];OutputDir=/alice/sim/2017/LHC17l5/279880/#alien_counter_03i#;LPMAnchorPassName=pass1;LPMRunNumber=279880;LPMProductionType=MC;LPMInteractionType=pp;LPMProductionTag=LHC17l5;LPMAnchorRun=279880;LPMAnchorProduction=LHC17m;LPMAnchorYear=2017;LPMJobTypeID=13272";
-LPMRunNumber = "279880";
+LPMMetaData = "Packages=[VO_ALICE@AliDPG::v5-09-XX-27, VO_ALICE@AliPhysics::v5-09-36-01-1, VO_ALICE@jemalloc::v3.6.0];OutputDir=/alice/sim/2017/LHC17l5/280140/#alien_counter_03i#;LPMAnchorPassName=pass1;LPMRunNumber=280140;LPMProductionType=MC;LPMInteractionType=pp;LPMProductionTag=LHC17l5;LPMAnchorRun=280140;LPMAnchorProduction=LHC17m;LPMAnchorYear=2017;LPMJobTypeID=13272";
+LPMRunNumber = "280140";
 LPMProductionType = "MC";
 LPMInteractionType = "pp";
 LPMProductionTag = "LHC17l5";
-LPMAnchorRun = "279880";
+LPMAnchorRun = "280140";
 LPMAnchorProduction = "LHC17m";
 LPMAnchorYear = "2017";
 Type = "Job";
