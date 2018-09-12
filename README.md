@@ -113,6 +113,9 @@ in a different way.
 * `InputDataCollection`: file (from the current directory) containing the list
   of input files to process, expecially for raw data reconstruction. The first
   tier of jobs will be run with one job per input file.
+* `TTL`: job will be forcefully killed after that many seconds. Note: in order
+  for this variable to work, it has to be imperatively listed among the
+  `JDLVariables`.
 
 Since the same JDL will be used for running many jobs, it is in some cases
 useful to distinguish between output directories, and to tell the job what is

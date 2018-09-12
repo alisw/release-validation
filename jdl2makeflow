@@ -229,12 +229,14 @@ type "$PROG" &> /dev/null || PROG="$(find "$ALIDPG_ROOT" -name "{{executable|bas
 [[ "$PROG" ]] || PROG="./{{executable|basename()}}"
 [[ -x "$PROG" ]] || PROG="bash $PROG"
 MAINERR=0
+[[ $ALIEN_JDL_TTL ]] && PROG="timeout -s9 $ALIEN_JDL_TTL $PROG" || true
 { env; echo + $PROG $ARGS; } >> stdout.log
 $PROG $ARGS $*  > >(tee -a stdout.log{% if no_live_out %} &> /dev/null{% endif %}) \\
                2> >(tee -a stderr.log{% if no_live_out %} &> /dev/null{% endif %}) || MAINERR=$?
 {% endif -%}
 [[ $MAINERR != 0 ]] && echo "Exited with errors ($MAINERR)" || echo "Exited with no errors";
 { echo + $PROG $ARGS "exited with $MAINERR"; } >> stdout.log
+[[ $MAINERR == 137 ]] && echo "Killed (probably timeout or memory limit)" >> stdout.log || true
 
 # Produce validation report
 touch validation_report.txt
