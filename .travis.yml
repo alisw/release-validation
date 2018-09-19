@@ -11,6 +11,13 @@ cache:
     - $HOME/cctools
 script: |
   set -e
+  function should_err() {
+    local ERR=0
+    set -x
+    "$@" || ERR=$?
+    set +x
+    [[ $ERR == 0 ]] && { echo "Should have erred, exited with success instead"; exit 1; } || true
+  }
   # Install cctools (cache installation)
   export PATH="$HOME/cctools/bin:$PATH"
   export LD_LIBRARY_PATH="$HOME/cctools/lib:$LD_LIBRARY_PATH"
@@ -38,9 +45,15 @@ script: |
         echo ">> Testing JDL under $DIR"
         echo "dummy eos-proxy" > eos-proxy
         echo 'EnvironmentCommand = "/bin/true";' >> ${DIR}_override.jdl
+        set -x
         coverage run -a ../../jdl2makeflow --summary $DIR.jdl
         coverage run -a ../../jdl2makeflow --parse-only $DIR.jdl
-        coverage run -a ../../jdl2makeflow --remove --force --parse $DIR.jdl
+        coverage run -a ../../jdl2makeflow --parse $DIR.jdl
+        coverage run -a ../../jdl2makeflow --work-dir work --remove --force --parse $DIR.jdl
+        should_err coverage run -a ../../jdl2makeflow --work-dir work --parse $DIR.jdl
+        touch not_a_directory_but_a_file
+        should_err coverage run -a ../../jdl2makeflow --work-dir not_a_directory_but_a_file --parse $DIR.jdl
+        should_err coverage run -a ../../jdl2makeflow --remove --parse $DIR.jdl
         touch work/dummy.done work/dummy.makeflowlog
         START_AT=
         STOP_AT=
@@ -67,11 +80,11 @@ script: |
                             '--stop-at cpass1')
         fi
         if [[ $START_AT ]]; then
-          coverage run -a ../../jdl2makeflow --force --start-at $START_AT --stop-at $STOP_AT --run --dryrun $DIR.jdl
+          coverage run -a ../../jdl2makeflow --work-dir work --force --start-at $START_AT --stop-at $STOP_AT --run --dryrun $DIR.jdl
           for W in "${WRONG_START_STOP[@]}"; do
             echo "Testing wrong arguments: $W"
             ERR=0
-            coverage run -a ../../jdl2makeflow --remove $W $DIR.jdl || ERR=$?
+            coverage run -a ../../jdl2makeflow --work-dir work --remove $W $DIR.jdl || ERR=$?
             [[ $ERR == 1 ]] || { echo "Should have failed with 1 but it exited with $ERR"; exit 1; }
           done
         fi

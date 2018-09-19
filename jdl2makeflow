@@ -10,6 +10,7 @@ from argparse import ArgumentParser, REMAINDER
 import subprocess
 from collections import OrderedDict
 from glob import glob
+from tempfile import mkdtemp
 
 lib_path = os.path.abspath(os.path.dirname(jdl2makeflow_helpers.__file__))
 
@@ -41,10 +42,10 @@ stages_rec = [
 all_stages_flat = [ y for x in stages_sim+stages_rec for y in x  ]
 
 ap = ArgumentParser()
-ap.add_argument("--dryrun", "-n", dest="dry_run", default=None, action="store_true",
+ap.add_argument("--dryrun", "--dry-run", "-n", dest="dry_run", default=None, action="store_true",
                 help="Generate Makeflow scripts that do not actually run any job")
-ap.add_argument("--workdir", "-w", dest="work_dir", default="work",
-                help="Makeflow work directory (defaults to \"work\")")
+ap.add_argument("--workdir", "--work-dir", "-w", dest="work_dir", default=None,
+                help="Makeflow work directory (defaults to a temp dir under the current one)")
 ap.add_argument("--parse", dest="parse", default=False, action="store_true",
                 help="Show all JDLs in JSON format before generating the Makeflow")
 ap.add_argument("--parse-only", "-p", dest="parse_only", default=False, action="store_true",
@@ -68,6 +69,8 @@ ap.add_argument("jdl",
 ap.add_argument("makeflow_opts", nargs=REMAINDER,
                 help="Options for the makeflow command")
 args = ap.parse_args()
+if not args.work_dir and (args.remove or args.force):
+  ap.error("Cannot use --remove/--force when the workdir is not specified")
 
 j2env = jinja2.Environment()
 j2env.filters["basename"] = lambda x: os.path.basename(x)
@@ -962,23 +965,28 @@ if args.summary:
   exit(0)
 
 # Create working directory. From now on we write to disk, not before
-if args.remove:
+if args.work_dir:
+  if args.remove:
+    try:
+      rmtree(args.work_dir)
+    except:
+      pass
   try:
-    rmtree(args.work_dir)
-  except:
-    pass
-try:
-  os.mkdir(args.work_dir)
-except OSError as e:
-  if e.errno == errno.EEXIST:
-    if not args.force:
-      print("Cannot create output directory \"%s\": remove existing one first" % args.work_dir)
-      exit(1)
+    os.mkdir(args.work_dir)
+  except OSError as e:
+    if e.errno == errno.EEXIST:
+      if not args.force:
+        print("Cannot create output directory \"%s\": remove existing one first" % args.work_dir)
+        exit(1)
+      else:
+        print("WARNING: output directory \"%s\" exists already" % args.work_dir)
     else:
-      print("WARNING: output directory \"%s\" exists already" % args.work_dir)
-  else:
-    print("Cannot create output directory \"%s\": %s" % (args.workdir, e))
-    exit(1)
+      print("Cannot create output directory \"%s\": %s" % (args.workdir, e))
+      exit(1)
+else:
+  # No workdir specified: use a temporarily created one
+  args.work_dir = mkdtemp(prefix=os.path.join(os.getcwd(), "tmp-workdir-"))
+  print("We are using {workdir} as working directory".format(workdir=args.work_dir))
 
 # Remove all done files found
 if args.force:
