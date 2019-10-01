@@ -346,7 +346,7 @@ node("$RUN_ARCH-relval") {
             THIS_EXITCODE=0
             set -x
             ls -la ~/.globus
-            /cvmfs/alice.cern.ch/bin/alienv setenv AliEn-ROOT-Legacy/0.0.7-10 -c "alien-token-init alienci"
+            /cvmfs/alice.cern.ch/bin/alienv setenv AliEn-ROOT-Legacy/0.0.7-10 -c "set -x && XrdSecDEBUG=1 alien-token-init alienci"
             jdl2makeflow ${PARSE_ONLY_SWITCH} ${DRY_RUN_SWITCH} ${START_AT:+--start-at $START_AT} ${STOP_AT:+--stop-at $STOP_AT} --parse --work-dir work --remove --run "${THIS_JDL}.jdl" -T wq -N alirelval_${RELVAL_NAME} -r 3 -C wqcatalog.marathon.mesos:9097 || THIS_EXITCODE=$?
             set +x
             jira_relval_finished "$JIRA_ISSUE" $THIS_EXITCODE "${TAGS// /, }" "$DONT_MENTION" || true
