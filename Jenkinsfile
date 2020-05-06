@@ -220,6 +220,7 @@ node("$RUN_ARCH-relval") {
            "JDL_TO_RUN=$JDL_TO_RUN",
            "RELVAL_TIMESTAMP=$RELVAL_TIMESTAMP",
            "RELVAL=$RELVAL",
+           "WQ_CATALOG=$WQ_CATALOG",
            "TAGS=$TAGS",
            "SKIP_CHECK_FRAMEWORK=$SKIP_CHECK_FRAMEWORK"]) {
     withCredentials([[$class: 'UsernamePasswordMultiBinding',
@@ -302,29 +303,6 @@ node("$RUN_ARCH-relval") {
             echo "=== Starting release validation for $THIS_JDL ==="
             [[ -e "${THIS_JDL}.jdl" ]] || { echo "Cannot find ${THIS_JDL}.jdl"; exit 1; }
 
-            if [[ $SKIP_CHECK_FRAMEWORK != true ]]; then
-              TIME0=$(date --utc +%s)
-              CURLOPTS="--max-time 10 -s -f -o /dev/null"
-              echo "Stopping framework..."
-              curl $CURLOPTS -X DELETE "http://leader.mesos:8080/v2/apps/wqmesos/tasks?scale=true" || true
-              echo "Stopping catalog..."
-              curl $CURLOPTS -X DELETE "http://leader.mesos:8080/v2/apps/wqcatalog/tasks?scale=true" || true
-              echo "Waiting for catalog to stop..."
-              for ((I=0; I<90; I++)); do
-                curl $CURLOPTS "http://wqcatalog.marathon.mesos:9097" && { sleep 1; continue; } || break
-              done
-              echo "Starting catalog..."
-              curl $CURLOPTS -X PUT -H "Content-type: application/json" --data '{ "instances": 1 }' "http://leader.mesos:8080/v2/apps/wqcatalog?force=true"
-              echo "Waiting for catalog to start..."
-              for ((I=0; I<90; I++)); do
-                curl $CURLOPTS "http://wqcatalog.marathon.mesos:9097" || { sleep 1; continue; }
-                break
-              done
-              echo "Starting framework..."
-              curl $CURLOPTS -X PUT -H "Content-type: application/json" --data '{ "instances": 1 }' "http://leader.mesos:8080/v2/apps/wqmesos?force=true"
-              echo "Framework restart took $(( $(date --utc +%s)-TIME0 )) seconds"
-            fi
-
             cp -v /secrets/eos-proxy .  # fetch EOS proxy in workdir
             preprocess_jdl "${THIS_JDL}.jdl" "${THIS_JDL}_override.jdl"
             echo "Job type was determined to be: ${JOB_TYPE}"
@@ -349,7 +327,7 @@ node("$RUN_ARCH-relval") {
             screen -L -d -m /cvmfs/alice.cern.ch/bin/alienv setenv AliEn-ROOT-Legacy/0.0.7-10 -c 'XrdSecDEBUG=1 alien-token-init alienci'
             sleep 5
             cat screenlog.0
-            jdl2makeflow ${PARSE_ONLY_SWITCH} ${DRY_RUN_SWITCH} ${START_AT:+--start-at $START_AT} ${STOP_AT:+--stop-at $STOP_AT} --parse --work-dir work --remove --run "${THIS_JDL}.jdl" -T wq -N alirelval_${RELVAL_NAME} -r 3 -C wqcatalog.marathon.mesos:9097 || THIS_EXITCODE=$?
+            jdl2makeflow ${PARSE_ONLY_SWITCH} ${DRY_RUN_SWITCH} ${START_AT:+--start-at $START_AT} ${STOP_AT:+--stop-at $STOP_AT} --parse --work-dir work --remove --run "${THIS_JDL}.jdl" -T wq -N alirelval_${RELVAL_NAME} -r 3 -C ${WQ_CATALOG} || THIS_EXITCODE=$?
             set +x
             jira_relval_finished "$JIRA_ISSUE" $THIS_EXITCODE "${TAGS// /, }" "$DONT_MENTION" || true
             [[ $THIS_EXITCODE == 0 ]] || EXITCODE=$THIS_EXITCODE  # propagate globally (will cause visible Jenkins error), but continue
