@@ -106,7 +106,7 @@ def preprocess_var(s, sh_mode):
   return s
 
 def gen_runjob(output_file, jdl, dry_run):
-  runjob = j2env.from_string("""#!/bin/bash -e
+  runjob = j2env.from_string("""#!/bin/bash -ex
 type zip unzip zipinfo timeout readlink
 ulimit -c unlimited  # enable core dumps
 {% for v in [ "LANG", "LANGUAGE", "LC_ALL", "LC_COLLATE", "LC_CTYPE", "LC_MESSAGES", \
