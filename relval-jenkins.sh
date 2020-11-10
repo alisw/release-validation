@@ -143,12 +143,22 @@ function jira_relval_finished() {
     && QAPLOTS="[QA plots|$FULL_DISPLAY_PREFIX/QAplots_passMC]" \
     || QAPLOTS="QA plots for [CPass1|$FULL_DISPLAY_PREFIX/cpass1_pass1/QAplots_CPass1] and [PPass|$FULL_DISPLAY_PREFIX/pass1/QAplots_PPass]"
 
+  # Check whether to show the link to the QA results comparison
+  COMPARE_QARESULTS=$REC_COMPARE_QARESULTS
+  COMPARE_QARESULTS_TEXT="* [QA comparison with reference|$FULL_DISPLAY_PREFIX/pass1/CompareAllHistos/compare_all_histos.txt]\n"
+  if [[ $JOB_TYPE == sim ]]; then
+    COMPARE_QARESULTS=$SIM_COMPARE_QARESULTS
+    COMPARE_QARESULTS_TEXT="* [QA comparison with reference|$FULL_DISPLAY_PREFIX/CompareAllHistos/compare_all_histos.txt]\n"
+  fi
+  [[ $COMPARE_QARESULTS ]] || COMPARE_QARESULTS_TEXT=  # no link display if no comparison done
+
   jira_comment "$JIRA_ISSUE"                                                                         \
-    "Release validation for *${VERSIONS_STR} ($JOB_TYPE)* finished: ${JIRASTATUS}.\n"            \
+    "Release validation for *${VERSIONS_STR} ($JOB_TYPE)* finished: ${JIRASTATUS}.\n"                \
     " * [Jenkins log|$BUILD_URL/console]\n"                                                          \
     " * [Validation output|$FULL_DISPLAY_PREFIX]\n"                                                  \
     "$JIRASUMMARY"                                                                                   \
     " * ${QAPLOTS}\n"                                                                                \
+    "${COMPARE_QARESULTS}"
     "\n"                                                                                             \
     "Contact persons for detectors and components:\n"                                                \
     "$(for D in "${DETECTORS[@]}"; do
@@ -180,7 +190,8 @@ CONFIG_OCDB = "cvmfs";
 OCDB_PATH = "/cvmfs/alice-ocdb.cern.ch";
 MC_SEED = "1#alien_counter_04i#";
 RELVAL_DISPLAY_URL = "${FULL_DISPLAY_PREFIX}";
-ExtraVariables = { "X509_USER_PROXY", "CONFIG_OCDB", "OCDB_PATH", "MC_SEED", "RELVAL_DISPLAY_URL" };
+COMPARE_QARESULTS = "${SIM_COMPARE_QARESULTS}";
+ExtraVariables = { "X509_USER_PROXY", "CONFIG_OCDB", "OCDB_PATH", "MC_SEED", "RELVAL_DISPLAY_URL", "COMPARE_QARESULTS" };
 OutputDir_override = "${FULL_OUTPUT_PREFIX}/#alien_counter_04i#";
 EnvironmentCommand = "export PACKAGES=\"$ALIENV_PKGS\"; export CVMFS_NAMESPACE=\"$CVMFS_NAMESPACE\"; source cvmfs_environment.sh; type aliroot";
 NoLiveOutput = 1;
@@ -205,7 +216,8 @@ EVENTS_PER_JOB = "$REC_LIMIT_EVENTS";
 ALIROOT_FORCE_COREDUMP = "1";
 RELVAL_DISPLAY_URL = "${FULL_DISPLAY_PREFIX}";
 ALITPCDCALIBRES_LIST = "$(dirname $(head -n1 input_files.txt))/TPCSPCalibration/alitpcdcalibres.txt";
-ExtraVariables = { "X509_USER_PROXY", "OCDB_PATH", "EVENTS_PER_JOB", "ALIROOT_FORCE_COREDUMP", "RELVAL_DISPLAY_URL", "ALITPCDCALIBRES_LIST" };
+COMPARE_QARESULTS = "${REC_COMPARE_QARESULTS}";
+ExtraVariables = { "X509_USER_PROXY", "OCDB_PATH", "EVENTS_PER_JOB", "ALIROOT_FORCE_COREDUMP", "RELVAL_DISPLAY_URL", "ALITPCDCALIBRES_LIST", "COMPARE_QARESULTS" };
 TTL_override = 10800;
 JDLVariables_append = { "TTL" };
 InputFile_override = { "eos-proxy", "cvmfs_environment.sh" };

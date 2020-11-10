@@ -18,6 +18,7 @@ lib_path = os.path.abspath(os.path.dirname(jdl2makeflow_helpers.__file__))
 stages_sim = [ [ "sim" ],
                [ "simResMerge", "simQaMerge" ],
                [ "simQaPlots" ],
+               [ "compareAllHistosMC" ],
                [ "mergeValidationReportsMC" ]
              ]
 stages_rec = [
@@ -36,6 +37,8 @@ stages_rec = [
                [ "ppass" ],
                [ "ppassQaMerge", "ppassResMerge" ],
                [ "ppassQaPlots" ],
+               # QA plots comparison
+               [ "compareAllHistosReco" ],
                # Validation reports
                [ "mergeValidationReportsReco" ]
              ]
@@ -896,6 +899,24 @@ elif jdl["JobType"] == "Reco":
 else:
   assert False, "should not happen: jdl[\"JobType\"] should be handled at this point"
 
+# Compare QA plots with older version
+compareKey = "compareAllHistos" + jdl["JobType"]
+if jdl["JobType"] == "MC":
+  compareOutputDir = os.path.dirname(preprocess_var(jdls["sim"]["OutputDir"], sh_mode=False))
+elif jdl["JobType"] == "Reco":
+  compareOutputDir = os.path.dirname(preprocess_var(jdls["ppass"]["OutputDir"], sh_mode=False))
+compareOutputDir = os.path.join(compareOutputDir, "CompareAllHistos")
+jdls[compareKey] = \
+  get_preprocessed_jdl(args.jdl,
+    override={ "Output": [ "compare_all_histos.txt", "core*", "validation_report.txt" ],
+               "OutputDir": compareOutputDir,
+               "Executable": "runCompareAllHistos.sh",
+               "SplitArguments": os.path.join(os.path.dirname(compareOutputDir), "QAresults.root") },
+    append={},
+    delete=[ "JobRange", "InputFilesFromList" ])
+del compareKey
+del compareOutputDir
+
 # Merge validation reports (common to all)
 mergeKey = "mergeValidationReports" + jdl["JobType"]
 mergeOutputDir = os.path.dirname(preprocess_var(jdl["OutputDir"], sh_mode=False))
@@ -1146,9 +1167,15 @@ for step in steps:
 {{ "simQaPlots"|job_cmd }}
 {% endif %}
 
+{% if do_stage("compareAllHistosMC") %}
+# compareAllHistosMC
+{{ "compareAllHistosMC"|job_head }} simQaPlots.done
+{{ "compareAllHistosMC"|job_cmd }}
+{% endif %}
+
 {% if do_stage("mergeValidationReportsMC") %}
 # mergeValidationReportsMC
-validation_report_full.txt {{ "mergeValidationReportsMC"|job_head }} simQaPlots.done
+validation_report_full.txt {{ "mergeValidationReportsMC"|job_head }} compareAllHistosMC.done
 {{ "mergeValidationReportsMC"|job_cmd }}
 {% endif %}
 {% endif %}
@@ -1258,9 +1285,15 @@ timeBins.log {{ "cpass0SpBins"|job_head }} cpass0Merge.done cpass0ResMerge.done
 {{ "ppassQaPlots"|job_cmd }}
 {% endif %}
 
+{% if do_stage("compareAllHistosReco") %}
+# compareAllHistosReco
+{{ "compareAllHistosReco"|job_head }} ppassQaPlots.done
+{{ "compareAllHistosReco"|job_cmd }}
+{% endif %}
+
 {% if do_stage("mergeValidationReportsReco") %}
 # mergeValidationReportsReco
-validation_report_full.txt {{ "mergeValidationReportsReco"|job_head }} ppassQaPlots.done
+validation_report_full.txt {{ "mergeValidationReportsReco"|job_head }} compareAllHistosReco.done
 {{ "mergeValidationReportsReco"|job_cmd }}
 {% endif %}
 {% endif %}
